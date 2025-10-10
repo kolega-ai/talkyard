@@ -47,6 +47,8 @@ trait FeedsDao {
 
   def getAtomFeedXml(request: ApiRequest[_], onlyEmbeddedComments: Boolean)
         : xml.Node = {
+    TESTS_MISSING // TyTFEED_ATOMBSC  if  onlyEmbeddedComments
+
     import request.{requester => anyRequester}
 
     // Cache only the Sysbot user's requests (for now at least),

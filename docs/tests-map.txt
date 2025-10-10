@@ -133,6 +133,10 @@ authn:
             - TESTS_MISSING  [email_lgi_susp]
     password user w/o email addr:
             - login-guest-or-user-without-email.3br.f  TyTLGI_GST_OR_WO_EML.TyTLGI_USR_0EM
+    dupl username:
+            - TESTS_MISSING
+    dupl email:
+            - TESTS_MISSING  TyTAU_DUPLUN
   forgot password -
     reset it:
           - password-login-reset.2br.f  TyT5KAES20W
@@ -2016,7 +2020,10 @@ api:
             - do-api-like-and-subscribe.2br  TyTEAPILIKESUBS
             - do-api-upvote-ideas-sort-by-votes.2br.d  TyTDOAPI_UPVOTE_IDEAS
   atom feed:
+    for forum:
             - TESTS_MISSING
+    for embedded comments:
+            - TESTS_MISSING  TyTFEED_ATOMBSC
   rss feed: No, there're only Atom feeds.
 
 api for comments,
@@ -2024,6 +2031,8 @@ comments api,
 embedded comments api:
             - embcom.manyframes.js-api.2br  TyTEMANYEMBDISAPI
             - embcom.manyframes.js-api.sso.2br.ec  TyTEMANYEMBDISAPISSO
+  atom feed:
+            - TESTS_MISSING  TyTFEED_ATOMBSC
 
 url api,
 frag action api,
