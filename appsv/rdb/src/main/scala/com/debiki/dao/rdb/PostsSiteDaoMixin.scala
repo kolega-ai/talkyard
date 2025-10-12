@@ -654,8 +654,10 @@ trait PostsSiteDaoMixin extends SiteTransaction {
     // left-outer-joining with post_actions3? [posts_join_order]
     val query = s""" -- loadEmbeddedCommentsApprovedNotDeleted
       $select__posts_po__leftJoin__patPostRels_pa
-      inner join pages3 pg using (site_id, page_id)
-      where pg.site_id = ?
+      inner join pages3 pg
+          on   pg.site_id = po.site_id
+          and  pg.page_id = po.page_id
+      where po.site_id = ?
         and pg.page_role = ${PageType.EmbeddedComments.toInt}
         and po.post_nr <> $TitleNr
         and po.post_nr <> $BodyNr
