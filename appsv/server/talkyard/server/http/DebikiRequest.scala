@@ -242,7 +242,7 @@ abstract class AuthnReqHeader extends SomethingToRateLimit {
   RENAME // to anyEmbeddingUrl? shouldn't be "...Param", why did I add "Param"?
   // Or  "...QueryParam" would be ok name
   def embeddingUrlParam: Opt[St] = {
-    var anyUrl = queryString.get("embgUrl").flatMap(_.headOption) map { encUrl =>
+    var anyUrl: Opt[St] = queryString.get("embgUrl").flatMap(_.headOption) map { encUrl =>
       java.net.URLDecoder.decode(encUrl, "UTF-8")
     }
 
@@ -259,10 +259,16 @@ abstract class AuthnReqHeader extends SomethingToRateLimit {
     // (The page would be shown on the real ty-forum domain, but links could
     // take you to  evil.com/-567/some-other-page — unexpected domain change)
     anyUrl.foreach { embgUrl =>
-      val embgUrl_asJava = new java.net.URI(embgUrl)
+      val embgUrl_asJava =
+            try new java.net.URI(embgUrl)
+            catch {
+              case ex: java.net.URISyntaxException =>
+                COULD_LOG // but rate limited
+                throwBadReq("TyEBADURI01", "Invalid embgUrl or embeddingUrl param")
+            }
       if (embgUrl_asJava.getHost == null) {
         // That's werid. An embedd*ing* website must have an address.
-        COULD_LOG
+        COULD_LOG // but rate limited
         return None
       }
       val okDomains = siteSettings.allowEmbeddingFromBetter
