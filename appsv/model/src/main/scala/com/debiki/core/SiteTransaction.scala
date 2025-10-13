@@ -437,6 +437,8 @@ trait SiteTransaction {   RENAME // to SiteTx — already started with a type Si
         dimensions: Option[(Int, Int)]): Unit
   def deleteUploadedFileMeta(uploadRef: UploadRef): Unit
 
+  def listUploads(): Seq[UploadInfoVb]
+
   /** Uploaded files are referenced via 1) URLs in posts (e.g. `<a href=...> <img src=...>`)
     * and 2) from users, if a file is someone's avatar image.
     */

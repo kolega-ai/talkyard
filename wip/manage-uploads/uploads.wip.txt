@@ -1,0 +1,197 @@
+[manage_uploads_wip]
+
+- List uploaded files, sort by (combinatoins of)
+    by time desc (most recently uploaded) — can be enough for now.
+    by uploader (who)
+    by uploaded file name (?)
+    by bytes,
+    by pixels,
+    by mime type
+    by page id / title
+       page tags
+    by category
+    by flags, Unwanted votes, Like votes
+
+- Show thumbnails?
+
+- Have a way to mark as reviewed,
+  a way to add notes & discuss, that is, to create a new page, post comments, and link the
+  page to one or many uploaded files, users, other discussions.
+  Maybe this new discussion type could be PageType.ContentReview? [ContentReview_page_type]
+
+- Maybe show only to logged in users, until has been reviewed?  (site config value?)
+
+- Optionally auto reviewed by AIs, show AI review result.
+
+
+# Test
+curl --user tyid=2:123459j2oqg3typ3femed7xyz -X POST -H 'Content-Type: application/json' \
+    http://e2e-test-cid-0-0-now-1577.localhost/-/list-uploads -d '{}'
+
+
+
+Db cols:  (upload_refs3, uploads, posts3, pages3)
+y = yes mabe show, make available for sorting?
+
+        site_id                  | -783
+        post_id                  | 123
+        base_url                 | /-/u/
+        hash_path                | 2/w/d7/v5jgdyzxogjypx3phikzrcypb7ffbx.jpg
+        added_by_id              | 101
+        added_at                 | 2025-10-19 23:34:09.752
+        uploaded_file_name_c     | 
+        base_url                 | /-/u/
+        hash_path                | 2/w/d7/v5jgdyzxogjypx3phikzrcypb7ffbx.jpg
+        original_hash_path       | 2/w/d7/v5jgdyzxogjypx3phikzrcypb7ffbx.jpg
+        size_bytes               | 28404
+        mime_type                | image/jpeg
+        width                    | 397
+        height                   | 612
+        uploaded_at              | 2025-10-19 23:34:03.218
+        updated_at               | 2025-10-19 23:34:09.752
+        num_references           | 1
+        verified_present_at      | 
+        verified_absent_at       | 
+        unused_since             | 
+    -   site_id                  | -783
+    y   unique_post_id           | 123
+    y   page_id                  | 2
+    y   post_nr                  | 1
+    -   parent_nr                | 
+    -   multireply               | 
+    ?   created_at               | 2025-10-19 23:34:09.752
+    ?   created_by_id            | 101
+    -   curr_rev_started_at      | 2025-10-19 23:34:09.752
+    -   curr_rev_last_edited_at  | 
+    ?   curr_rev_by_id           | 101
+    -   last_approved_edit_at    | 
+    -   last_approved_edit_by_id | 
+    -   num_distinct_editors     | 1
+    -   num_edit_suggestions     | 0
+    -   last_edit_suggestion_at  | 
+    -   safe_rev_nr              | 1
+    ?   approved_source          | ...
+    ?   approved_html_sanitized  | ...
+        approved_at              | 2025-10-19 23:34:09.752
+    ?   approved_by_id           | 101
+        approved_rev_nr          | 1
+        curr_rev_source_patch    | 
+        curr_rev_nr              | 1
+        collapsed_status         | 0
+        collapsed_at             | 
+        collapsed_by_id          | 
+    y   closed_status            | 0
+        closed_at                | 
+        closed_by_id             | 
+    y   hidden_at                | 
+        hidden_by_id             | 
+        hidden_reason            | 
+    y   deleted_status           | 0
+        deleted_at               | 
+        deleted_by_id            | 
+    ?   pinned_position          | 
+        pinned_at                | 
+        pinned_by_id             | 
+    y   num_pending_flags        | 0
+    ?   num_handled_flags        | 0
+    y   num_like_votes           | 0
+    y   num_wrong_votes          | 0
+    ?   num_times_read           | 0
+    y   num_bury_votes           | 0
+    y   num_unwanted_votes       | 0
+    ?   type                     | 
+        prev_rev_nr              | 
+        branch_sideways          | 
+        ext_id                   | 
+        smtp_msg_id_prefix_c     | 2.1
+        private_pats_id_c        | 
+        sub_type_c               | 
+        val_i32_c                | 
+    ?   postponed_status_c       | 
+    ?   answered_status_c        | 
+    ?   doing_status_c           | 
+    ?   review_status_c          | 
+    ?   unwanted_status_c        | 
+    ?   flagged_status_c         | 
+    ?   hidden_status_c          | 
+    ?   index_prio_c             | 
+    ?   private_status_c         | 
+    ?   creator_status_c         | 
+    ?   order_c                  | 
+
+        site_id                  | -783
+        page_id                  | 2
+    y   page_role                | 12
+    y   category_id              | 2
+        created_at               | 2025-10-19 23:34:09.752
+        updated_at               | 2025-10-19 23:34:09.752
+        published_at             | 2025-10-19 23:34:09.752
+        bumped_at                | 2025-10-19 23:34:09.752
+    ?   author_id                | 101
+        num_child_pages          | 0
+    ?   embedding_page_url       | 
+        num_likes                | 0
+        num_wrongs               | 0
+        deleted_at               | 
+        num_replies_visible      | 0
+        num_replies_to_review    | 0
+        num_replies_total        | 0
+        num_bury_votes           | 0
+        num_unwanted_votes       | 0
+        last_reply_at            | 
+        pin_order                | 
+        pin_where                | 
+        num_op_like_votes        | 0
+        num_op_wrong_votes       | 0
+        num_op_bury_votes        | 0
+        num_op_unwanted_votes    | 0
+        num_op_replies_visible   | 0
+    ?   answered_at              | 
+        answer_post_id           | 
+    ?   done_at                  | 
+    ?   closed_at                | 
+    ?   locked_at                | 
+    ?   frozen_at                | 
+    ?   unwanted_at              | 
+    ?   planned_at               | 
+        version                  | 1
+        last_reply_by_id         | 
+        frequent_poster_1_id     | 
+        frequent_poster_2_id     | 
+        frequent_poster_3_id     | 
+        frequent_poster_4_id     | 
+        html_tag_css_classes     | 
+        html_head_title          | 
+        html_head_description    | 
+        layout                   | 0
+    ?   hidden_at                | 
+        incl_in_summaries        | 
+        started_at               | 
+        postponed_til_c          | 
+        num_posts_total          | 2
+        ext_id                   | 
+        num_op_do_it_votes_c     | 0
+        num_op_do_not_votes_c    | 0
+        answered_by_id_c         | 
+        published_by_id_c        | 
+        postponed_by_id_c        | 
+        planned_by_id_c          | 
+        started_by_id_c          | 
+        paused_by_id_c           | 
+        done_by_id_c             | 
+        closed_by_id_c           | 
+        locked_by_id_c           | 
+        frozen_by_id_c           | 
+        unwanted_by_id_c         | 
+        hidden_by_id_c           | 
+        deleted_by_id_c          | 
+        forum_search_box_c       | 
+        forum_main_view_c        | 
+        forum_cats_topics_c      | 
+        comt_order_c             | 
+        comt_nesting_c           | 
+        comts_start_hidden_c     | 
+        comts_start_anon_c       | 
+        new_anon_status_c        | 
+
+

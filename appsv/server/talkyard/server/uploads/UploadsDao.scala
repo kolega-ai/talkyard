@@ -26,6 +26,7 @@ import debiki.EdHttp._
 import debiki.dao.SiteDao
 import talkyard.server.UploadsUrlBasePath
 import talkyard.server.rendr.NashornParams
+import talkyard.server.authz.AdminReqrAndTgt
 import java.{io => jio, lang => jl, util => ju}
 import java.awt.image.BufferedImage
 import java.nio.{file => jf}
@@ -50,6 +51,9 @@ trait UploadsDao {
     * The reason for the slashes is that then all uploads won't end up in the same
     * directory, if stored on localhost (some file systems don't want 99999 files in a
     * single directory).
+    *
+    * @param uploadedFileName BUG Harmless: The [uploaded_file_name] is forgotten before we've
+    * saved the new post and added a row in  upload_refs3.
     */
   def addUploadedFile(uploadedFileName: St, tempFile: jio.File, uploadedById: TrueId,
         browserIdData: BrowserIdData): UploadRef = {
@@ -321,6 +325,13 @@ trait UploadsDao {
       }
       throwIfTooMuch(bytesUploadedLastWeek, maxBytesWeek, "7 days")
       throwIfTooMuch(bytesUploadedLastDay, maxBytesDay, "24 hours")
+    }
+  }
+
+
+  def listUploads(reqTgt: AdminReqrAndTgt): Seq[UploadInfoVb] = {
+    this.readTx { tx =>
+      tx.listUploads()
     }
   }
 }

@@ -775,6 +775,10 @@ object PageType {
     override def mayChangeRole = false
   }
 
+  // [ContentReview_page_type] ?
+  //
+  //case object ContentReview extends PageType(1234)
+
   case object EmbeddedComments extends PageType(5, staffOnly = false)
 
   /** Lists blog posts. */

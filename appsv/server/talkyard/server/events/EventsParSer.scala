@@ -224,7 +224,7 @@ object EventsParSer {
           posts = Nil,
           pageAndSearchHits = None)
 
-    var pageJson = ThingsFoundJson.JsPageFound(
+    var pageJson = ThingsFoundJson.JsPageFound(  // [list_pages_found]
           pageFoundStuff,
           authorIdsByPostId = Map.empty, // only needed for search hits
           authorsById = authorsById,

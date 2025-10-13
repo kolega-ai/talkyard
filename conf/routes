@@ -262,6 +262,8 @@ GET   /-/_int_req/may-download-file/:pubSiteId/*hashPath  talkyard.server.upload
 POST  /-/upload-public-file     talkyard.server.uploads.UploadsController.uploadPublicFile
 POST  /-/upload-avatar          talkyard.server.uploads.UploadsController.uploadAvatar(userId: Int)
 POST  /-/remove-avatar          talkyard.server.uploads.UploadsController.removeAvatar
+POST  /-/list-uploads           talkyard.server.uploads.UploadsController.listUploads
+
 
 # CLEAN_UP remove, hardcode path in Globals instead?  [2KGLCQ4]
 GET   /-/u/*relativePath        talkyard.server.uploads.UploadsController.servePublicFile(relativePath)

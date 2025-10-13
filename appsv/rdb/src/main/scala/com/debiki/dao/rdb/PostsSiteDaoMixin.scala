@@ -48,7 +48,7 @@ trait PostsSiteDaoMixin extends SiteTransaction {
 
   private def select__posts_po__someJoin__patPostRels_pa(someJoin: St): St = s"""
         select po.*,
-               -- Builds an array of arrays:
+               -- Builds an array of arrays:  [array_agg]
                --    [[rel-type, from-pat], [other-rel-type, other-pat], ...]
                array_agg(array[pa.rel_type_c, pa.from_pat_id_c])
                     filter (where pa.rel_type_c is not null)

@@ -169,6 +169,7 @@ package object search {
     // catsCanSeeById: Map[..]  //  [search_results_extra_cat_lookup]  ?
     ) {
 
+    // Dupl code [mk_tag_types_set]
     def tagTypeIds: Set[TagTypeId] = {
       val ids = mut.HashSet.empty[TagTypeId]
       UX; SHOULD // incl tags on comments too, not just the page?
