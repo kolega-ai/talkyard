@@ -30,7 +30,7 @@ declare global {
 export const enum IsWhere {
   Forum = 1,
   LoginPopup = 2,
-
+  Feed = 3,  // e.g. RSS or Atom feeds
 
   EmbFirst = 4,
   EmbCommentsIframe = 4,  // hmm could add an enum value for EmbSessionIframe

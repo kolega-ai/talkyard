@@ -3094,14 +3094,16 @@ export class TyE2eTestBrowser {
     /**
      * Useful if navigating to a new page, but don't know exactly when will have done that.
      */
-    async waitUntilPageHtmlSourceMatches_1 (toMatch: St | RegExp) {
+    async waitUntilPageHtmlSourceMatches_1 (toMatch: St | RegExp,
+            ps: { refreshBetween?: Bo } = {}) {
       // _1 = only for 1 this.#br
-      const regex = await getRegExpOrDie(toMatch);
+      const regex = getRegExpOrDie(toMatch);
       await this.waitUntil(async () => {
         const source = await this.#br.getPageSource();
         return regex.test(source);
       }, {
         message: `Waiting for page source to match:  ${regex}`,
+        ...ps,
       });
     }
 

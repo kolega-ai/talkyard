@@ -649,6 +649,8 @@ trait PostsSiteDaoMixin extends SiteTransaction {
 
   RENAME // to loadEmbeddedCommentsActiveOnly? or add an activeOnly: Bo param
   def loadEmbeddedCommentsApprovedNotDeleted(limit: Int, orderBy: OrderBy): immutable.Seq[Post] = {
+    // Tests:
+    //   - embcom.feeds.2br.ec  TyTEC_FEEDS
     dieIf(orderBy != OrderBy.MostRecentFirst, "TyE60RKTJF4", "Unimpl")
     COULD_OPTIMIZE // It would be better to inner-join posts3 and pages3 first, before
     // left-outer-joining with post_actions3? [posts_join_order]

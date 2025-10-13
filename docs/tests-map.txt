@@ -626,6 +626,9 @@ security:
   embedded:
     can't load iframe from wrong domain:
             - embcom.create-site-admin-intro-tour-no-verif-email.2br.ec  TyT6KRKV20.TyTSEC_FRAMEANC
+  feeds:
+    private categories excluded:
+            - embcom.feeds.2br.ec  TyTEC_FEEDS.TyTFEED_0PRIV
 
 deleted users:  [.del_susp_usr]
             - SEC_TEST_MISSING
@@ -2021,9 +2024,18 @@ api:
             - do-api-upvote-ideas-sort-by-votes.2br.d  TyTDOAPI_UPVOTE_IDEAS
   atom feed:
     for forum:
+            - embcom.feeds.2br.ec  TyTEC_FEEDS  partly for forums too
             - TESTS_MISSING
     for embedded comments:
-            - TESTS_MISSING  TyTFEED_ATOMBSC
+            - embcom.feeds.2br.ec  TyTEC_FEEDS
+            - TESTS_MISSING  TyTFEED_ONLYEMBCOM
+                Not-embedded-comments posts shouldn't be in the comments feed.
+    security:
+      bookmarks & drafts not included:
+            - TESTS_MISSING  TyTFEED_ONLYEMBCOM
+      private categories:
+            - embcom.feeds.2br.ec  TyTEC_FEEDS.TyTFEED_0PRIV
+
   rss feed: No, there're only Atom feeds.
 
 api for comments,
@@ -2032,7 +2044,7 @@ embedded comments api:
             - embcom.manyframes.js-api.2br  TyTEMANYEMBDISAPI
             - embcom.manyframes.js-api.sso.2br.ec  TyTEMANYEMBDISAPISSO
   atom feed:
-            - TESTS_MISSING  TyTFEED_ATOMBSC
+            - embcom.feeds.2br.ec  TyTEC_FEEDS
 
 url api,
 frag action api,

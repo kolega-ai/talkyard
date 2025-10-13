@@ -47,13 +47,16 @@ trait FeedsDao {
 
   def getAtomFeedXml(request: ApiRequest[_], onlyEmbeddedComments: Boolean)
         : xml.Node = {
-    TESTS_MISSING // TyTFEED_ATOMBSC  if  onlyEmbeddedComments
+    // Tests:
+    // - embcom.feeds.2br.ec  TyTEC_FEEDS
+    // - TESTS_MISSING,  See  /^ *feeds/  in tests-map.txt.
 
     import request.{requester => anyRequester}
 
     // Cache only the Sysbot user's requests (for now at least),
     // So won't need to add complicated clear-cache code now.  (CACHHHEE)
     if (anyRequester.exists(_.id != SysbotUserId)) {
+      // [get_api_rate_limits]
       self.context.rateLimiter.rateLimit(RateLimits.ExpensiveGetRequest, request)
       return loadAtomFeedXml(request.reqrInf, onlyEmbComments = onlyEmbeddedComments)
     }
@@ -84,8 +87,9 @@ trait FeedsDao {
                 onlyEmbComments = onlyEmbComments,
                 inclUnlistedPagePosts = onlyEmbComments))
 
-    if (postsOneMaySee.isEmpty)
-      throwNotFound("TyE0FEEDPOSTS", "No posts found, or they are private")
+    // Better to return the proper Atom xml all the time?
+    //if (postsOneMaySee.isEmpty)
+    //  throwNotFound("TyE0FEEDPOSTS", "No posts found, or they are private")
 
     val origin = theSiteOrigin()
     debiki.AtomFeedXml.renderFeed(origin, postsOneMaySee, pageStuffById,
