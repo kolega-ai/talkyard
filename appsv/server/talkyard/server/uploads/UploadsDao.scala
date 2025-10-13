@@ -15,7 +15,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package debiki.dao
+package talkyard.server.uploads
 
 import scala.collection.Seq
 import com.debiki.core._
@@ -23,6 +23,7 @@ import com.debiki.core.Prelude._
 import com.google.{common => guava}
 import debiki.{Globals, ImageUtils, TextAndHtmlMaker}
 import debiki.EdHttp._
+import debiki.dao.SiteDao
 import talkyard.server.UploadsUrlBasePath
 import talkyard.server.rendr.NashornParams
 import java.{io => jio, lang => jl, util => ju}

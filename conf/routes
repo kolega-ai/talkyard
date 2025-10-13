@@ -257,15 +257,15 @@ GET   /-/load-post-revisions    controllers.EditController.loadPostRevisions(pos
 
 POST  /-/start-private-group-talk controllers.GroupTalkController.sendMessage
 
-GET   /-/_int_req/may-upload-file                         controllers.UploadsController.intReq_mayUploadFile(sizeBytes: Int)
-GET   /-/_int_req/may-download-file/:pubSiteId/*hashPath  controllers.UploadsController.authUpload(pubSiteId, hashPath)
-POST  /-/upload-public-file     controllers.UploadsController.uploadPublicFile
-POST  /-/upload-avatar          controllers.UploadsController.uploadAvatar(userId: Int)
-POST  /-/remove-avatar          controllers.UploadsController.removeAvatar
+GET   /-/_int_req/may-upload-file  talkyard.server.uploads.UploadsController.intReq_mayUploadFile(sizeBytes: Int)
+GET   /-/_int_req/may-download-file/:pubSiteId/*hashPath  talkyard.server.uploads.UploadsController.authUpload(pubSiteId, hashPath)
+POST  /-/upload-public-file     talkyard.server.uploads.UploadsController.uploadPublicFile
+POST  /-/upload-avatar          talkyard.server.uploads.UploadsController.uploadAvatar(userId: Int)
+POST  /-/remove-avatar          talkyard.server.uploads.UploadsController.removeAvatar
 
 # CLEAN_UP remove, hardcode path in Globals instead?  [2KGLCQ4]
-GET   /-/u/*relativePath        controllers.UploadsController.servePublicFile(relativePath)
-#GET   /-/uploads/public/*relativePath controllers.UploadsController.servePublicFileLong(relativePath)
+GET   /-/u/*relativePath        talkyard.server.uploads.UploadsController.servePublicFile(relativePath)
+#GET   /-/uploads/public/*relativePath talkyard.server.uploads.UploadsController.servePublicFileLong(relativePath)
 
 # Merge with CloseCollapseController into PostController?
 # POST  /-/pin-at-position      controllers.PinController.pinAtPosition

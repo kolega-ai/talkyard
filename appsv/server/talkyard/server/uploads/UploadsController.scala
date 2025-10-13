@@ -15,14 +15,13 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package controllers
+package talkyard.server.uploads
 
 import scala.collection.Seq
 import com.debiki.core._
 import com.debiki.core.Prelude._
 import debiki._
 import debiki.EdHttp._
-import debiki.dao.UploadsDao._
 import talkyard.server.{TyContext, TyController}
 import talkyard.server.http.ApiRequest
 import talkyard.server.authn.MinAuthnStrength
@@ -33,6 +32,7 @@ import play.api.libs.Files
 import play.api.libs.json.{JsString, JsValue, Json}
 import play.api.mvc._
 import play.api.mvc.MultipartFormData.FilePart
+import UploadsDao._
 
 /** Uploads files and serves uploaded files.
   */

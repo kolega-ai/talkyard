@@ -129,7 +129,7 @@ class TyAppComponents(appLoaderContext: ApplicationLoader.Context)
     new _root_.controllers.EditController(cc, tyCtx),
     new _root_.controllers.PageTitleSettingsController(cc, tyCtx),
     new _root_.controllers.GroupTalkController(cc, tyCtx),
-    new _root_.controllers.UploadsController(cc, tyCtx),
+    new _root_.talkyard.server.uploads.UploadsController(cc, tyCtx),
     new _root_.controllers.CloseCollapseController(cc, tyCtx),
     sitePatchController,
     new _root_.controllers.DebugTestController(cc, tyCtx),

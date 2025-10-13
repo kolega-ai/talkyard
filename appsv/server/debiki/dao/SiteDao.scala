@@ -161,7 +161,7 @@ class SiteDao(
   with TagsDao
   with SearchDao
   with talkyard.server.spam.QuickSpamCheckDao
-  with UploadsDao
+  with talkyard.server.uploads.UploadsDao
   with UserDao
   with MessagesDao
   with WatchbarDao

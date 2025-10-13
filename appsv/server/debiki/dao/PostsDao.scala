@@ -31,6 +31,7 @@ import play.api.libs.json.{JsObject, JsValue}
 import scala.collection.{immutable, mutable}
 import scala.collection.mutable.ArrayBuffer
 import talkyard.server.dao._
+import talkyard.server.uploads.UploadsDao
 import PostsDao._
 import talkyard.server.authz.{Authz, ReqrAndTgt, MembReqrAndTgt}
 import talkyard.server.spam.SpamChecker
