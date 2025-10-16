@@ -133,7 +133,6 @@ class ListController @Inject()(cc: ControllerComponents, edContext: TyContext)
               scoreAlg = pop.PagePopularityCalculator.CurrentScoreAlg)
     }
 
-    // [not_a_server_error]
     val limitMax100: Opt[i32] = parseOptI32(listQueryJson, "limit", min = Some(1), max = Some(100))
     val newerOrAt: Opt[When] = parseOptWhen(listQueryJson, "newerOrAt")
     val olderOrAt: Opt[When] = parseOptWhen(listQueryJson, "olderOrAt")

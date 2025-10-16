@@ -21,19 +21,11 @@ Instead of this file, maybe use a combination of:
 SHOULD NEXT: Make these limits configurable at runtime, and trigger superadmin notifications
 when exceeded 50%, so can review and bump. And warnings if exceeds 75%, 90%.
 
-[not_a_server_error]
-This shouldn't result in server errors/warnings:
-BadJsonException
-    val limitMax100: Opt[i32] = parseOptI32(listQueryJson, "limit", min = Some(1), max = Some(100))
-    val newerOrAt: Opt[When] = parseOptWhen(listQueryJson, "newerOrAt")
-    val olderOrAt: Opt[When] = parseOptWhen(listQueryJson, "olderOrAt")
-But currently:
-    API request unexpected exception [TyEUNEXPEX],
-    site SiteBrief(1234,abcde12345,Some(example.talkyard.net),Active,ffPrP01A14,None,None,None),
-    ip 123.123.123.123: /-/v0/list\ndebiki.JsonUtils$BadJsonException: limit too large: 500, max is: 100 [TyEJSNGTMX]
-Need some exception flag like isClientError  or  isClientsFault ?
-and then maybe log an info message, or collect info about malformed json
-to better know what docs to write / improve?
+[maybe_server_error]
+Most BadJsonException shouldn't result in server errors/warnings, other should?
+Need some exception flag like  isServerBug ?
+and then log an error or warning, otherwise just a debug message, or collect info
+about malformed json to better know what docs to write / improve?
 
 [first_last_apr_at]
 Fix sort order bug: Add Post.firstApprovedAt.
@@ -143,9 +135,12 @@ Add a black hanglock next to things one can see, because of one's extra
 access permissions? E.g. editing category settings, or backlinks from
 access restricted topics.
 
-[admin_log]
+[admin_log][ADMERRLOG]
 Make site specific errors visible to site admins — so no need
 to have Linux root access.
+
+[dev_friendly]
+How to make Ty more developer friendly.
 
 [logger_everywhere]
 Pass loggers to the models and rdb Scala modules, so they don't need to use
