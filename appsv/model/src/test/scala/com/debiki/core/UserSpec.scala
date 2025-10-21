@@ -160,10 +160,11 @@ class UserSpec extends AnyFreeSpec with must.Matchers {   // TyT05RDPS24
       }
 
       "and not .suffix that looks like file names, like '.jpg'" in {  // [5WKAJH20]
-        for (suffix <- Seq("bmp", "css", "csv", "exe", "gif", "htm", "html", "ico",
+        for (suffix <- Seq("avif", "bmp", "css", "csv", "exe", "gif", "htm", "html", "ico",
             "js", "json", "jpg", "jpeg", "pdf", "png", "pgp", "rtf", "tar", "txt",
-            "mpeg", "mpg", "mp4", "mp4", "m4u", "ogg", "ogx", "svg", "tif", "tiff",
-            "webp", "wma", "woff", "xml", "zip")) {
+            "mpeg", "mpg", "mp4", "mp4", "m4u",  // Apache Tika doesn't recognize:  "mpo"
+            "ogg", "ogx", "svg", "tif", "tiff",
+            "webp", "webm", "wma", "woff", "xml", "zip")) {
 
           Participant.makeOkayUsername(s"fil-en.ame.$suffix", allowDotDash = true, _ => false)
             .get mustBe s"fil_en_ame_$suffix"

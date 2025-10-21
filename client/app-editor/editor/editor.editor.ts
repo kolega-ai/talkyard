@@ -930,14 +930,13 @@ export const Editor = createFactory<any, EditorState>({
     const parts = url.split('.');
     const suffix = parts.length > 1 ? _.last(parts) : '';
 
-    // (SVG doesn't work in old browsers, fine. tif doesn't work for me.)
     const isImage = suffix === 'png' || suffix === 'jpg' || suffix === 'jpeg' || suffix === 'gif' ||
-        suffix === 'mpo' || suffix === 'bmp' || suffix === 'svg';
+        suffix === 'mpo' || suffix === 'bmp' || suffix === 'svg' ||
+        suffix === 'webp' || suffix === 'avif';
 
-    // Only .mp4 is supported by all browsers.
     const isVideo = suffix === 'mp4' || suffix === 'ogg' || suffix === 'webm';
 
-    let link;
+    let link: St;
     if (isImage) {
       // <img> is a void element, shouldn't be any </img> close tag.
       link = `<img src="${url}">`;

@@ -361,6 +361,14 @@ object UploadsDao {
 
   val HlsVideoMediaSegmentsSuffix = ".m3u8"
 
+  /** Images and .pdf. */
+  val CommonImageFileSuffixes = Set(
+        "tif", "tiff", "gif", "jpeg", "jpg", "jif", "jfif", "jp2", "jpx", "j2k", "j2c",
+        "fpx", "pcd", "png", "mpo", "pdf", "webp", "avif")
+
+  /** See: https://en.wikipedia.org/wiki/Video_file_format. */
+  val CommonVideoFileSuffixes = Set("webm", "mkv", "ogv", "ogg", "gifv", "mp4", "m4v")
+
   private val Log4 = math.log(4)
 
 
@@ -478,13 +486,10 @@ object UploadsDao {
     // (Convert to lowercase, don't want e.g. both .JPG and .jpg.)
     val suffix = fileName.takeRightWhile(_ != '.').toLowerCase
 
-    // Common image file formats:
-    // (https://www.library.cornell.edu/preservation/tutorial/presentation/table7-1.html)
-    if ("tif tiff gif jpeg jpg jif jfif jp2 jpx j2k j2c fpx pcd png pdf".contains(suffix))
+    if (CommonImageFileSuffixes.contains(suffix))
       return suffix
 
-    // Common movie file formats: (https://en.wikipedia.org/wiki/Video_file_format)
-    if ("webm mkv ogv ogg gifv mp4 m4v".contains(suffix))
+    if (CommonVideoFileSuffixes.contains(suffix))
       return suffix
 
     if (!fileName.exists(_ == '.'))

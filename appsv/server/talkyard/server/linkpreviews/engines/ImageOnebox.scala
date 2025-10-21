@@ -35,7 +35,7 @@ class ImagePrevwRendrEng(globals: Globals)
   extends InstantLinkPrevwRendrEng(globals) {
 
   override val regex: Regex =
-    """^(https?:)?\/\/.+\.(png|jpg|jpeg|gif|bmp|tif|tiff)(\?.*)?$""".r
+    """^(https?:)?\/\/.+\.(png|jpg|jpeg|gif|bmp|tif|tiff|webp|avif)(\?.*)?$""".r
 
   def providerLnPvCssClassName = "s_LnPv-Img"
 

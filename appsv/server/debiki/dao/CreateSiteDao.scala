@@ -78,8 +78,11 @@ object CreateSiteDao {  RENAME // but to what. & move, but to where?
     val New = Group(
       AllMembersId, "all_members", Some("All Members"), createdAt = now, // , grantsTrustLevel = Some(TrustLevel.NewMember))
       perms = PatPerms.create(IfBadDie,
-            maxUploadBytes = Some(1 * Mebibyte),
-            allowedUplExts = Some("jpeg jpg png gif"),
+            maxUploadBytes = Some(2 * Mebibyte),
+            // Do NOT allow uploading videos by default. Videos are harder to review &
+            // moderate, since you can't see at a glance what it is — one needs to actually
+            // play the video. And, there can be sound.
+            allowedUplExts = Some("jpeg jpg png gif webp avif"),
             canSeeOthersEmailAdrs = None))
 
     val Basic = Group(
