@@ -94,6 +94,7 @@ $previewBorderBottom = 15px solid $previewBackground !important;
   margin-bottom: 10px;
 
 // Remove colors from a draft one isn't currently editing. (4036RT459)
+// (Maybe `filter: grayscale(100%)` would be simpler? See  n_0Ed for chat msgs below.)
 .s_T-Prvw-NotEd
   .s_T_YourPrvw
     color: hsl(0, 0%, 15%);
@@ -104,6 +105,14 @@ $previewBorderBottom = 15px solid $previewBackground !important;
     color: black;
   .s_P-Prvw
     padding: 14px 10px 7px !important;
+
+// If the currently-writing chat message preview became inactive, because we started
+// editing some other old chat message instead (clicked its edit button). [inactive_chat_prv]
+.n_0Ed
+  &.s_T_YourPrvw,
+  &.s_C_M-Prvw  // '.s_P-Prvw' is for threaded comments, not chat messages.
+    opacity: 0.4;
+    filter: grayscale(100%);
 
 .DW .s_T_ReTo_Prvw,
 .DW .s_T_YourPrvw_ToWho
@@ -567,8 +576,11 @@ html:not(.mouse) .dw-rr
   margin-right: 12px;
 .dw-p-hd .dw-ago
   margin-right: 7px;
+/* Skip this now, when there's only icons instead of "[icon] edit  [icon] delete" texts,
+  and the  bookmark  icon is the 1st, link icon 2nd, edit just the 3rd. [chat_btn_order]
 .dw-p-hd:has(.icon-edit) .dw-ago  // ... but if there's an edit pencil icon just after,
   margin-right: 3px; // ... then, less magin (so the icon won't be far away)
+  */
 .dw-p-hd .n_EdAt
   white-space: nowrap;
 .esP_viewHist
@@ -978,6 +990,7 @@ html:not(.mouse) .dw-rr
 // Marks  incl bookmarks
 //===========================
 
+// [dupl_hdr_icn]
 span.s_P_H_Bm.dw-p-mark-click
   padding: 5px;
   margin-right: 4px;
@@ -991,6 +1004,7 @@ span.s_P_H_Bm.dw-p-mark-click
   -ms-user-select: none;
   user-select: none;
 
+  // [dupl_hover]
   &:hover
     outline: 2px solid hsl($uiHue, 100%, 77%);
     background: hsl($uiHue, 100%, 97%);
@@ -1015,7 +1029,8 @@ html.touch .dw-p-mark-click
   display: inline-block;
   position: relative;
   top: 1px;
-  margin: 0 8px 0 0;
+  //margin: 0 8px 0 0; — why 8px?
+  margin: 0;
   background: transparent;
   color: hsl(0, 0%, 72%);
   font-size: $postFontSize;

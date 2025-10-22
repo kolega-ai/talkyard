@@ -42,6 +42,17 @@ export function pat_isAuthorOf(pat: Me | Pat, post: Post, patsById: PpsById): Bo
   // Is pat used an anonym or [pseudonyms_later].
   const author: Pat | U = patsById[post.authorId];
   return !!author && author.anonForId === pat.id;
+
+  // Old deleted code from chat.ts, maybe should do here?:
+  // -----
+  // And, for now, for new post previews: [305KGWGH2]
+  // const author: BriefUser = store_getAuthorOrMissing(store, post);
+  // ...
+  // const isMine = me.id === author.id ||
+  //     // And, for now, for new post previews: [305KGWGH2]
+  //     author.id === UnknownUserId;
+  // const isMineClass = isMine ? ' s_My' : '';
+  // -----
 }
 
 

@@ -21,7 +21,7 @@ import com.debiki.core._
 import com.debiki.core.isProd
 import com.debiki.core.Prelude._
 import debiki._
-import debiki.dao.SiteDao
+import debiki.dao.{MovePostWhere, SiteDao}
 import debiki.EdHttp._
 import debiki.JsonUtils._
 import talkyard.server.linkpreviews.{LinkPreviewRenderer, PreviewResult, LinkPreviewProblem}
@@ -36,7 +36,7 @@ import EditController._
 import scala.concurrent.ExecutionContext
 import talkyard.server.JsX.{JsDraft, JsDraftOrNull, JsStringOrNull}
 import talkyard.server.authn.MinAuthnStrength
-import talkyard.server.authz.Authz
+import talkyard.server.authz.{Authz, ReqrAndTgt}
 import org.scalactic.{Good, Or, Bad}
 
 
@@ -424,14 +424,26 @@ class EditController @Inject()(cc: ControllerComponents, edContext: TyContext)
     val postId = (request.body \ "postId").as[PostId]   // id not nr
     val newHost = (request.body \ "newHost").asOpt[String] // ignore for now though
     val newSiteId = (request.body \ "newSiteId").asOpt[SiteId] // ignore for now though
-    val newPageId = (request.body \ "newPageId").as[PageId]
-    val newParentNr = (request.body \ "newParentNr").asOpt[PostNr].getOrElse(PageParts.BodyNr)
+    // Either:
+    val anyNewPageId: Opt[PageId] = parseOptSt(request.body, "newPageId")
+    val anyNewParentNr: Opt[PostNr] = parseOptInt32(request.body, "newParentNr")
+    val newParent: Opt[PagePostNr] = anyNewPageId map { newPageId =>
+      PagePostNr(newPageId, anyNewParentNr.getOrElse(PageParts.BodyNr))
+    }
+    // Or:
+    val createNewPage: Bo = parseBoDef(request.body, "createNewPage", false)
+
+    throwBadReqIf(createNewPage && newParent.isDefined, "TyE4G02GK7",
+          "Can't both move post to a new page, and move it to an existing page")
 
     CHECK_AUTHN_STRENGTH
 
-    val (_, storePatch) = request.dao.movePostIfAuth(PagePostId(pageId, postId),
-      newParent = PagePostNr(newPageId, newParentNr), moverId = request.theReqerTrueId,
-      request.theBrowserIdData)
+    val (_, storePatch) = request.dao.movePostIfAuth(
+          PagePostId(pageId, postId),
+          moveWhere =
+              if (createNewPage) MovePostWhere.ToNewDiscussion
+              else MovePostWhere.UnderOldPost(newParent.getOrDie("TyE650SKLW2")),
+          reqrAndMover = request.theReqrTargetSelf) // [alias_4_principal]
 
     OkSafeJson(storePatch)
   }

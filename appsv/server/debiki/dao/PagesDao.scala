@@ -191,6 +191,7 @@ trait PagesDao {
   }
 
 
+  // But we do check AuZ?  See:  this._createPageOptBodyImpl_ifAuZ   [dupl_prem_chk]
   def createPageSkipAuZ(pageRole: PageType, pageStatus: PageStatus, anyCategoryId: Option[CategoryId],
         withTags: ImmSeq[TagTypeValue],
         anyFolder: Option[String], anySlug: Option[String], title: TitleSourceAndHtml,
@@ -262,6 +263,7 @@ trait PagesDao {
   /** Returns (PagePath, body-post, any-review-task)
     *
     * @param asAlias — must be a new anonym, since anons are per page, and this page is new.
+    * @return A tuple: (PagePathWithId, new-body-post: Post, Opt[ReviewTask])
     */
   def createPageImpl(pageRole: PageType,
       pageStatus: PageStatus,
@@ -288,8 +290,112 @@ trait PagesDao {
       )(
       tx: SiteTx,
       staleStuff: StaleStuff,
-      ):
-        (PagePathWithId, Post, Option[ReviewTask]) = {
+      ): (PagePathWithId, Post, Option[ReviewTask]) = {
+    val res = this._createPageOptBodyImpl_ifAuZ(
+          pageRole = pageRole,
+          pageStatus = pageStatus,
+          anyCategoryId = anyCategoryId,
+          anyFolder = anyFolder,
+          anySlug = anySlug,
+          showId = showId,
+          title = title,
+          pageBodyParams = Some(PageBodyParams(
+                body,
+                withTags = withTags,
+                spamRelReqStuff = spamRelReqStuff,
+                hidePageBody = hidePageBody,
+                bodyPostType = bodyPostType,
+                skipNotfsAndAuditLog = skipNotfsAndAuditLog)),
+          pinOrder = pinOrder,
+          pinWhere = pinWhere,
+          byWho = byWho,
+          asAlias = asAlias,
+          layout = layout,
+          discussionIds = discussionIds,
+          embeddingUrl = embeddingUrl,
+          extId = extId,
+          createAsDeleted = createAsDeleted,
+          )(tx, staleStuff)
+    (res._1, res._2.getOrDie("TyE58KJL1SW"), res._3)
+  }
+
+
+  def createPageNoBody_ifAuZ(
+          pageRole: PageType,
+          pageStatus: PageStatus,
+          anyCategoryId: Opt[CatId],
+          anySlug: Opt[St],
+          title: TitleSourceAndHtml,
+          byWho: Who,
+          asAlias: Opt[WhichAliasPat],
+          skipNotfsAndAuditLog: Bo,
+          )(
+          tx: SiteTx,
+          staleStuff: StaleStuff,
+          ): (PagePathWithId, Opt[ReviewTask]) = {
+
+    val res = this._createPageOptBodyImpl_ifAuZ(
+          pageRole,
+          pageStatus,
+          anyCategoryId = anyCategoryId,
+          anyFolder = None,
+          anySlug = anySlug,
+          showId = true,
+          title = title,
+          pageBodyParams = None,
+          byWho = byWho,
+          asAlias = asAlias,
+          )(tx, staleStuff)
+    dieIf(res._2.isDefined, "TyE0PKSXKDM")
+    (res._1, res._3)
+  }
+
+
+  private case class PageBodyParams(
+      body: TextAndHtml,
+      hidePageBody: Bo = false,
+      bodyPostType: PostType,
+      withTags: ImmSeq[TagTypeValue],
+      spamRelReqStuff: Opt[SpamRelReqStuff],
+      skipNotfsAndAuditLog: Bo = false)
+
+  private def _createPageOptBodyImpl_ifAuZ(
+          pageRole: PageType,
+          pageStatus: PageStatus,
+          anyCategoryId: Opt[CatId],
+          anyFolder: Opt[St],
+          anySlug: Opt[St],
+          showId: Bo,
+          title: TitleSourceAndHtml,
+          pageBodyParams: Opt[PageBodyParams],
+          pinOrder: Opt[i32] = None,
+          pinWhere: Opt[PinPageWhere] = None,
+          byWho: Who,
+          asAlias: Opt[WhichAliasPat] = None,
+          layout: Opt[PageLayout] = None,
+          discussionIds: Set[AltPageId] = Set.empty,
+          embeddingUrl: Opt[St] = None,
+          extId: Opt[St] = None,
+          createAsDeleted: Bo = false,
+          )(
+          tx: SiteTx,
+          staleStuff: StaleStuff,
+          ): (PagePathWithId, Opt[Post], Opt[ReviewTask]) = {
+
+
+    val (anyBody: Opt[TextAndHtml],
+          withTags: ImmSeq[TagTypeValue],
+          spamRelReqStuff: Opt[SpamRelReqStuff],
+          bodyPostType: PostType,
+          hidePageBody: Bo,
+          skipNotfsAndAuditLog: Bo,
+          ) =
+            pageBodyParams match {
+              case None => (None, Nil, None, PostType.Normal, false, true)
+              case Some(p) =>
+                (Some(p.body), p.withTags, p.spamRelReqStuff,
+                    p.bodyPostType, p.hidePageBody, p.skipNotfsAndAuditLog)
+            }
 
     val now = globals.now()
     val realAuthorId = byWho.id
@@ -314,7 +420,9 @@ trait PagesDao {
     require(!anyFolder.exists(_.isEmpty), "EsE6JGKE3")
     // (Empty slug ok though, e.g. homepage.)
     require(!title.source.isEmpty && !title.safeHtml.isEmpty, "EsE7MGK24")
-    require(!body.source.isEmpty && !body.safeHtml.isEmpty, "EsE1WKUQ5")
+    anyBody foreach { body =>
+      require(!body.source.isEmpty && !body.safeHtml.isEmpty, "EsE1WKUQ5")
+    }
     require(pinOrder.isDefined == pinWhere.isDefined, "Ese5MJK2")
     require(embeddingUrl.trimNoneIfBlank == embeddingUrl, "Cannot have blank emb urls [TyE75SPJBJ]")
 
@@ -336,7 +444,15 @@ trait PagesDao {
     val (
       reviewReasons: Seq[ReviewReason],
       shallApprove: Bo) =
-          throwOrFindReviewNewPageReasons(personaAndLevels, pageRole, tx)  // [mod_deanon_risk]
+            anyBody match {
+              case None =>
+                // Nothing to review, just the title, but skip for now.
+                // Currently only happens if moving a post to a new page. [page_no_body]
+                (Nil, true)
+              case Some(_) =>
+                throwOrFindReviewNewPageReasons(
+                        personaAndLevels, pageRole, tx)  // [mod_deanon_risk]
+            }
 
     // Similar to: [find_approver_id].  [mod_deanon_risk]
     val approvedById =
@@ -388,33 +504,41 @@ trait PagesDao {
       htmlSanitized = title.safeHtml,
       approvedById = approvedById)
 
-    val bodyPost = Post.createBody(
-      uniqueId = bodyUniqueId,
-      pageId = pageId,
-      createdAt = now.toJavaDate,
-      createdById = authorMaybeAnon.id,
-      source = body.source,
-      htmlSanitized = body.safeHtml,
-      postType = bodyPostType,
-      approvedById = approvedById)
-      .copy(
-        bodyHiddenAt = ifThenSome(hidePageBody, now.toJavaDate),
-        bodyHiddenById = ifThenSome(hidePageBody, authorMaybeAnon.id),
-        bodyHiddenReason = None) // add `hiddenReason` function parameter?
+    val (anyBodyPost: Opt[Post], newTags: ImmSeq[Tag], uploadRefs: Set[UploadRef]) =
+            anyBody match {
+      case None => (None, Nil, Set.empty)
+      case Some(body) =>
+        val bodyPost: Post = Post.createBody(
+              uniqueId = bodyUniqueId,
+              pageId = pageId,
+              createdAt = now.toJavaDate,
+              createdById = authorMaybeAnon.id,
+              source = body.source,
+              htmlSanitized = body.safeHtml,
+              postType = bodyPostType,
+              approvedById = approvedById)
+              .copy(
+                  bodyHiddenAt = ifThenSome(hidePageBody, now.toJavaDate),
+                  bodyHiddenById = ifThenSome(hidePageBody, authorMaybeAnon.id),
+                  bodyHiddenReason = None) // add `hiddenReason` function parameter?
 
-    var nextTagId: TagId =
-          if (withTags.nonEmpty) tx.nextTagId()
-          else -1
-    val newTags: ImmSeq[Tag] = withTags map { typeAndVal: TagTypeValue =>
-      val tag: Tag = typeAndVal.withIdAndPostId(nextTagId, postId = bodyPost.id, IfBadAbortReq)
-      nextTagId += 1
-      tag
-    }
+        var nextTagId: TagId =
+              if (withTags.nonEmpty) tx.nextTagId()
+              else -1
+        val newTags: ImmSeq[Tag] = withTags map { typeAndVal: TagTypeValue =>
+          val tag: Tag = typeAndVal.withIdAndPostId(
+                              nextTagId, postId = bodyPost.id, IfBadAbortReq)
+          nextTagId += 1
+          tag
+        }
 
-    val uploadRefs = body.uploadRefs
-    if (Globals.isDevOrTest) {
-      val uplRefs2 = findUploadRefsInPost(bodyPost, site = Some(site))
-      dieIf(uploadRefs != uplRefs2, "TyE7RTEGP04", s"uploadRefs: $uploadRefs, 2: $uplRefs2")
+        val uploadRefs: Set[UploadRef] = body.uploadRefs
+        if (Globals.isDevOrTest) {
+          val uplRefs2 = findUploadRefsInPost(bodyPost, site = Some(site))
+          dieIf(uploadRefs != uplRefs2, "TyE7RTEGP04", s"uploadRefs: $uploadRefs, 2: $uplRefs2")
+        }
+
+        (Some(bodyPost), newTags, uploadRefs)
     }
 
     val pageMeta = PageMeta.forNewPage(
@@ -424,7 +548,9 @@ trait PagesDao {
       extId = extId,
       creationDati = now.toJavaDate,
       deletedAt = if (createAsDeleted) Some(now) else None,
-      numPostsTotal = 2, // title & body
+      numPostsTotal =
+            if (anyBody.isDefined) 2  // title & body
+            else 1,                   // only title  [page_no_body]
       layout = layout,
       pinOrder = pinOrder, pinWhere = pinWhere,
       categoryId = anyCategoryId,
@@ -442,19 +568,22 @@ trait PagesDao {
 
     val anyReviewTask =
       if (reviewReasons.isEmpty) None
-      else Some(ReviewTask(
-        id = tx.nextReviewTaskId(),
-        reasons = reviewReasons.to(immutable.Seq),
-        createdById = SystemUserId,
-        createdAt = now.toJavaDate,
-        createdAtRevNr = Some(bodyPost.currentRevisionNr),
-        maybeBadUserId = authorMaybeAnon.id,
-        pageId = Some(pageId),
-        postId = Some(bodyPost.id),
-        postNr = Some(bodyPost.nr)))
+      else {
+        val bodyPost = anyBodyPost.getOrDie("TyE60SKWJN4")
+        Some(ReviewTask(
+              id = tx.nextReviewTaskId(),
+              reasons = reviewReasons.to(immutable.Seq),
+              createdById = SystemUserId,
+              createdAt = now.toJavaDate,
+              createdAtRevNr = Some(bodyPost.currentRevisionNr),
+              maybeBadUserId = authorMaybeAnon.id,
+              pageId = Some(pageId),
+              postId = Some(bodyPost.id),
+              postNr = Some(bodyPost.nr)))
+      }
 
     // [dupl_spam_check_code]
-    val anySpamCheckTask =
+    val anySpamCheckTask: Opt[SpamCheckTask] = anyBodyPost flatMap { bodyPost =>
       if (spamRelReqStuff.isEmpty || !globals.spamChecker.spamChecksEnabled) None
       else if (settings.userMustBeAuthenticated) None
       else if (!canStrangersSeePagesInCat_useTxMostly(anyCategoryId, tx)) None
@@ -474,27 +603,32 @@ trait PagesDao {
               pageId = pageMeta.pageId,
               pageType = pageMeta.pageType,
               pageAvailableAt = When.fromDate(pageMeta.publishedAt getOrElse pageMeta.createdAt),
-              htmlToSpamCheck = body.safeHtml,
+              htmlToSpamCheck = anyBody.getOrDie("TyE2PKLUSP05").safeHtml,
               language = settings.languageCode)),
             reqrId = authorMaybeAnon.id,
             requestStuff = spamStuffPageUri))
       }
+    }
 
-    val stats = UserStats(
-      // If is a pseudo/anonym, add stats to the pseudo/anon account only,
-      // not to the true user — otherwise others might be able to guess who hen is.
-      authorMaybeAnon.id,
-      lastSeenAt = now,
-      lastPostedAt = Some(now),
-      firstNewTopicAt = Some(now),
-      numDiscourseTopicsCreated = pageRole.isChat ? 0 | 1,
-      numChatTopicsCreated = pageRole.isChat ? 1 | 0)
+    // Update user stats.
+    if (anyBody.isDefined) {
+      val stats = UserStats(
+            // If is a pseudo/anonym, add stats to the pseudo/anon account only,
+            // not to the true user — otherwise others might be able to guess who hen is.
+            authorMaybeAnon.id,
+            lastSeenAt = now,
+            lastPostedAt = Some(now),
+            firstNewTopicAt = Some(now),
+            numDiscourseTopicsCreated = pageRole.isChat ? 0 | 1,
+            numChatTopicsCreated = pageRole.isChat ? 1 | 0)
 
-    addUserStats(stats)(tx)
+      addUserStats(stats)(tx)
+    }
+
     tx.insertPageMetaMarkSectionPageStale(pageMeta)(IfBadDie)
     tx.insertPagePath(pagePath)
     tx.insertPost(titlePost)
-    tx.insertPost(bodyPost)
+    anyBodyPost.foreach(tx.insertPost)
     newTags foreach tx.insertTag
 
     // By default, one follows all activity on a page one has created — unless this is some page
@@ -506,18 +640,23 @@ trait PagesDao {
           PageNotfPref(realAuthorId, NotfLevel.WatchingAll, pageId = Some(pageId)))
     }
 
-    if (approvedById.isDefined) {
+    for {
+      bodyPost <- anyBodyPost
+      if shallApprove
+    } {
       updatePagePopularity(
         PreLoadedPageParts(pageMeta, Vector(titlePost, bodyPost)), tx)
 
       // Add links, and uncache linked pages — need to rerender them, with
       // a backlink to this new page.
       // Need not: staleStuff.addPageId(new-page-id) — page didn't exist before.
-      saveDeleteLinks(bodyPost, body, authorMaybeAnon.trueId2, tx, staleStuff, skipBugWarn = true)
+      saveDeleteLinks(bodyPost, anyBody.getOrDie("TyE2FKLSN53"),
+            authorMaybeAnon.trueId2, tx, staleStuff, skipBugWarn = true)
     }
 
     uploadRefs foreach { hashPathSuffix =>
-      tx.insertUploadedFileReference(bodyPost.id, hashPathSuffix, authorMaybeAnon.id)
+      tx.insertUploadedFileReference(anyBodyPost.getOrDie("TyE7FSUMM3J2").id,
+            hashPathSuffix, authorMaybeAnon.id)
     }
 
     discussionIds.foreach(id => tx.insertAltPageId("diid:" + id, realPageId = pageId))
@@ -543,9 +682,10 @@ trait PagesDao {
     anySpamCheckTask.foreach(tx.insertSpamCheckTask)
 
     if (!skipNotfsAndAuditLog) {
+      val bodyPost = anyBodyPost.getOrDie("TyE5JKRN27")
       val notifications = notfGenerator(tx).generateForNewPost(  // dao incls new page body
             newPageDao(pagePath.pageId, tx), bodyPost,
-            Some(body), anyNewModTask = anyReviewTask,
+            Some(anyBody.getOrDie("TyE8UYW4C")), anyNewModTask = anyReviewTask,
             postAuthor = Some(authorMaybeAnon), trueAuthor = Some(realAuthor))
 
       tx.saveDeleteNotifications(notifications)
@@ -563,7 +703,9 @@ trait PagesDao {
             postNr = Some(bodyPost.nr)), tx)
     }
 
-    tx.indexPostsSoon(titlePost, bodyPost)
+    anyBodyPost foreach { bodyPost =>
+      tx.indexPostsSoon(titlePost, bodyPost)
+    }
 
     // Don't start rendering html for this page in the background. [5KWC58]
     // (Instead, when the user requests the page, we'll render it directly in
@@ -571,7 +713,7 @@ trait PagesDao {
     // for the background thread (which is too complicated) or 2) we'd generate
     // the page twice, both in the request thread and in a background thread.)
 
-    (pagePath, bodyPost, anyReviewTask)
+    (pagePath, anyBodyPost, anyReviewTask)
   }
 
 
@@ -991,10 +1133,11 @@ trait PagesDao {
 
 
   def refreshPageMetaBumpVersion(pageId: PageId, markSectionPageStale: Bo,
-          newBumpedAt: Opt[When] = None)(tx: SiteTx): U = {
+           updateBumpedAt: Bo, newBumpedAt: Opt[When] = None)(tx: SiteTx): U = {
     // Also elsewhere, bit dupl.  [dupl_upd_pg_stats]
     val page = newPageDao(pageId, tx)
-    val newMeta = page.meta.copyWithUpdatedStats(page, newBumpedAt)
+    val newMeta = page.meta.copyWithUpdatedStats(
+          page, updateBumpedAt = updateBumpedAt, newBumpedAt = newBumpedAt)
     tx.updatePageMeta(newMeta, oldMeta = page.meta,
       markSectionPageStale = markSectionPageStale)
   }

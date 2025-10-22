@@ -448,6 +448,7 @@ declare namespace debiki2 {
   function store_makeDraftPostPatch(store: Store, page: Page, draft: Draft): StorePatch;
 
   function post_makePreviewIdNr(parentPostNr: PostNr, newPostType: PostType): PostNr & PostId;
+  function post_isReply(post: Post): Bo;
 
   function store_makeNewPostPreviewPatch(
       store: Store, page: Page, parentPostNr: PostNr, safePreviewHtml: string,

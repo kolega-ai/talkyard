@@ -2415,19 +2415,30 @@ export function changePostType(postNr: number, newType: PostType, success: () =>
 }
 
 
-export function movePost(postId: PostId, newHost: SiteId, newPageId: PageId,
-      newParentNr: PostNr, success: (post: Post) => void) {
+export function movePost(postId: PostId, newHost: SiteId, newPageId: PageId | N,
+      newParentNr: PostNr | N, createNewPage: Bo,
+      onOk: (post: Post, anyNewPageId: PageId | U) => V) {
   postJsonSuccess('/-/move-post', (patch: StorePatch) => {
     ReactActions.patchTheStore(patch);
     const post = _.values(patch.postsByPageId)[0][0];
     dieIf(!post, 'EsE7YKGW2');
-    success(post);
+    let anyNewPageId = !createNewPage ? null : _.keys(patch.postsByPageId)[0];
+    dieIf(createNewPage && !anyNewPageId, `TyE5F4HTSK`);
+    // @ifdef DEBUG
+    if (createNewPage) {
+      const curPageId = debiki2.ReactStore.allData().currentPageId;
+      dieIf(anyNewPageId === curPageId,
+            `Bad new page id, same as current: ${anyNewPageId} [TyE5F4H2SKJ]`);
+    }
+    // @endif
+    onOk(post, anyNewPageId);
   }, {
     pageId: getPageId(),
-    postId: postId,
-    newHost: newHost,
-    newPageId: newPageId,
-    newParentNr: newParentNr,
+    postId,
+    newHost,
+    newPageId,
+    newParentNr,
+    createNewPage,
   });
 }
 

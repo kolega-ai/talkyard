@@ -1346,7 +1346,7 @@ interface Store extends Origins, DiscStore, PartialEditorStoreState {
   pageMetaBriefById: { [pageId: string]: PageMetaBrief };
 
   isEditorOpen?: boolean;  // default: false
-  // From PartialEditorStoreState:
+  // Inherited from PartialEditorStoreState:
   // editorsPageId?: PageId;
   // replyingToPostNr?: PostNr;
   // editingPostId?: PostId;

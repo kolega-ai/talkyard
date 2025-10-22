@@ -27,6 +27,7 @@ import controllers.EditController
 import debiki._
 import debiki.EdHttp._
 import talkyard.server.pubsub.StorePatchMessage
+import talkyard.server.authz.{Authz, ReqrAndTgt}
 import play.api.libs.json.{JsObject, JsValue}
 import scala.collection.{immutable, mutable}
 import scala.collection.mutable.ArrayBuffer
@@ -54,6 +55,14 @@ case class LoadPostsResult(
   bookmarks: immutable.Seq[Post],
   )
 
+
+sealed abstract class MovePostWhere
+
+object MovePostWhere {
+  // RENAME  to just  UnderPost ????
+  case class UnderOldPost(pagePostNr: PagePostNr) extends MovePostWhere
+  case object ToNewDiscussion extends MovePostWhere
+}
 
 
 /** Loads and saves pages and page parts (e.g. posts and patches).
@@ -3043,10 +3052,22 @@ trait PostsDao {
 
 
   RENAME // all ... IfAuth to IfAuZ (if authorized)
-  def movePostIfAuth(whichPost: PagePostId, newParent: PagePostNr, moverId: TrueId,
-        browserIdData: BrowserIdData): (Post, JsObject) = {
+  def movePostIfAuth(whichPost: PagePostId, moveWhere: MovePostWhere,
+        reqrAndMover: ReqrAndTgt): (Post, JsObject) = {
 
-    if (newParent.postNr == PageParts.TitleNr)
+    throwForbiddenIf(reqrAndMover.areNotTheSame, "TyE40JK2FJ5", """Can't move comments
+          on behalf of someone else (not implemented)""")
+    throwForbiddenIf(reqrAndMover.reqr.isAnon, "TyE40JK2FJ6", """Cannot move posts
+          anonymously (not implemented)""")
+    throwForbiddenIf(reqrAndMover.reqr.isGuestOrAnon, "TyE40JK2FJ7", """Only members
+          can move posts elsewhere""")
+
+    val (createNewPage, anyNewParent) = moveWhere match {
+      case MovePostWhere.UnderOldPost(oldPost) => (false, Some(oldPost))
+      case MovePostWhere.ToNewDiscussion => (true, None)
+    }
+
+    if (anyNewParent.map(_.postNr) is PageParts.TitleNr)
       throwForbidden("EsE4YKJ8_", "Cannot place a post below the title")
 
     val now = globals.now()
@@ -3054,18 +3075,80 @@ trait PostsDao {
     val postAfter = writeTx { (tx, staleStuff) =>
       UX; SHOULD // let people move their own posts. Also, think about anons,
       // so an anon can move their own post, but only elsewhere *on the same page*.
-      val mover = tx.loadTheUser(moverId.curId)
-      if (!mover.isStaff)
-        throwForbidden("EsE6YKG2_", "Only staff may move posts")
+      val moverAndLevels = loadUserAndLevels(reqrAndMover.reqrToWho, tx)
+      val mover: User = moverAndLevels.user.toUserOrThrow
+      if (Globals.isDevOrTest) {
+        // Let's let people move their own comments, so can write auto tests.
+        // But let's not enable in prod yet.
+      }
+      else if (!mover.isStaff)
+        throwForbidden("TyE6YKG2", "Only staff may move posts")  // for now
 
-      val postToMove = tx.loadThePost(whichPost.postId)
-      if (postToMove.nr == PageParts.TitleNr || postToMove.nr == PageParts.BodyNr)
-        throwForbidden("EsE7YKG25_", "Cannot move page title or body")
+      val moversGroupIds = this.getOnesGroupIds(mover)
+
+      val postToMove: Post = tx.loadPostById(whichPost.postId) getOrElse {
+        throwIndistinguishableNotFound("TyEMOPO_PONF_")
+      }
+
+      // AuthZ: The mover needs permission to 1) move the post being moved
+      // — for now, that can be the Edit permission. And 2a) permission to place
+      // the post on an already existing page — that can be the Reply permission, for now.
+      // Or 2b) permission to create a new page (with the post being moved as the orig post).
+      //
+      // Later, mabye a MovePost or MoveComment permission? Or should that be
+      // part of an AlterComment permission?  [granular_perms]
+
+      // ----- AuthZ 1/2: May move the post?
 
       val postAuthor = tx.loadTheParticipant(postToMove.createdById)
 
-      val newParentPost = tx.loadPost(newParent) getOrElse throwForbidden(
-        "EsE7YKG42_", "New parent post not found")
+      val fromPage: PageDao = this.newPageDao(postToMove.pageId, tx)
+      val fromPageAuthor = this.getTheParticipant(fromPage.meta.authorId)
+      val fromPageCatsRootLast = this.getAncestorCategoriesSelfFirst(fromPage.meta.categoryId)
+
+      throwNoUnless(Authz.mayEditPost(
+            moverAndLevels, asAlias = None, groupIds = moversGroupIds,
+            postToMove, postAuthor = postAuthor, fromPage.meta, pageAuthor = fromPageAuthor,
+            this.getAnyPrivateGroupTalkMembers(fromPage.meta),
+            inCategoriesRootLast = fromPageCatsRootLast,
+            tooManyPermissions = this.getPermsOnPages(fromPageCatsRootLast),
+            now = now), "TyEMOPO_M0EDIT_")
+
+      if (postToMove.nr == PageParts.TitleNr || postToMove.nr == PageParts.BodyNr)
+        throwForbidden("EsE7YKG25_", "Cannot move page title or body")
+
+      // We specify both page id and post id, when moving a post, so we can detect if
+      // someone else moved it already to another page (a kind of race condition).
+      if (postToMove.pageId != whichPost.pageId)
+        throwForbidden("TyEMOPO_ALRMVD", o"""Wrong page id. It seems this post was moved
+              to another page, moments ago.""")
+
+      // Some posts can't be moved — not impl, or sometimes doesn't make sense.
+      // E.g. moving "Page deleted by NNN" automatic meta comment to *another* page.
+      // Or moving a bookmark (but ok to move a post that has been bookmarked
+      // — this'll move the bookmarks too [mv_bookmarked_post]).
+      // Cmp w `post_isReply()` [can_mv_post].
+      //
+      // However, if `postToMove` can be moved, probably it's ok to move its descendants too?
+      // Even if maybe a bit odd, e.g. moving parts of a discussion to a chat.
+      // But better make it work, assume ppl a bit know what they're doing?
+      // We might want to update its type though, [if_mv_post_upd_type].
+      //
+      throwForbiddenIf(!postToMove.tyype.isComment && !postToMove.tyype.isChat
+            && !postToMove.tyype.isWiki,
+            "TyE8KWEL25", s"Can't move posts of type ${postToMove.tyype} elsewhere.'")
+
+      val anyNewParentPost: Opt[Post] = anyNewParent map { newParent =>
+        tx.loadPost(newParent) getOrElse throwForbidden(
+              // Or throwIndistinguishableNotFound() instead?
+              // But then should clarify it's for the parent post — since pat may indeed
+              // see the post han tries to move.
+              "EsE7YKG42_", "New parent post not found")
+      }
+
+      // [mv_bookmarked_post]
+      UNTESTED // What about moving bookmarked posts? This'll move the bookmark too?
+      // What if a descendant has a bookmark?
 
       // [priv_comts]
       // If a private post gets moved, its Post.privatePatsId won't change just because of
@@ -3077,31 +3160,88 @@ trait PostsDao {
       // (AssignedTo relationships are (will be) in  pat_rels_t  whose  to_post_id_c  points to
       // the post id, which stays the same.)
 
-      throwForbiddenIf(postToMove.id == newParentPost.id,
+      throwForbiddenIf(anyNewParentPost.map(_.id) is postToMove.id,
             "TyE7SRJ2MG_", "A post cannot be its own parent post")
-
-      throwForbiddenIf(!newParentPost.isOrigPost && newParentPost.tyype != postToMove.tyype,
-        "TyE8KWEL24", "The new parent post is in a different page section. " +
-          "Use the 'Move to X section' button instead")
 
       throwForbiddenIf(postToMove.deletedStatus.isDeleted,
             "TyE50GKJ34", "Post deleted")
 
-      throwForbiddenIf(newParentPost.deletedStatus.isDeleted,
+      throwForbiddenIf(anyNewParentPost.exists(_.deletedStatus.isDeleted),
             "TyE8KFG1J", "New parent post deleted")
 
       dieIf(postToMove.collapsedStatus.isCollapsed, "EsE5KGV4", "Unimpl")
       dieIf(postToMove.closedStatus.isClosed, "EsE9GKY03", "Unimpl")
-      dieIf(newParentPost.collapsedStatus.isCollapsed, "EsE7YKG32", "Unimpl")
-      dieIf(newParentPost.closedStatus.isClosed, "EsE2GLK83", "Unimpl")
+      dieIf(anyNewParentPost.exists(_.collapsedStatus.isCollapsed), "EsE7YKG32", "Unimpl")
+      dieIf(anyNewParentPost.exists(_.closedStatus.isClosed), "EsE2GLK83", "Unimpl")
 
-      val fromPage = newPageDao(postToMove.pageId, tx)
-      val toPage = newPageDao(newParent.pageId, tx)
+      val toPage: PageDao = anyNewParentPost match {
+        case Some(newParent) =>
+          val toPageDao = newPageDao(newParent.pageId, tx)
+
+          // ----- AuthZ 2a/2: May move to page?
+
+          val toPageMeta = toPageDao.meta
+          val toPageAuthor = this.getTheParticipant(toPageMeta.authorId)
+          val toPageCatsRootLast = this.getAncestorCategoriesSelfFirst(toPageMeta.categoryId)
+          throwNoUnless(Authz.mayPostReply(
+                moverAndLevels,
+                // See [4_doer_not_reqr].
+                asAlias = None,
+                groupIds = moversGroupIds,
+                postToMove.tyype, toPageMeta, pageAuthor = toPageAuthor,
+                // Let's skip checking if any reply-to-posts has been deleted. The mover
+                // hopefully knows what han is doing?  COULD pop up a dialog and ask,
+                // if new parent post was just deleted.  [8KUWC1]
+                replyToPosts = Nil,
+                privateGroupTalkMemberIds =
+                      this.getAnyPrivateGroupTalkMembers(toPageMeta),
+                inCategoriesRootLast = toPageCatsRootLast,
+                tooManyPermissions = this.getPermsOnPages(toPageCatsRootLast),
+                now = now),
+                "TyEMOPO_M0RE_")
+          toPageDao
+
+        case None =>
+          // We'll alter `postToMove` (below) so it becomes the page body.
+          dieIf(!createNewPage, "TyE3J02RKWL4")
+
+          // ----- AuthZ 2b/2: May create page?
+
+          // This isn't just authZ — we also do create the page, if we can. (In a db tx,
+          // so rollbacks if there's some error later.)
+
+          // Place the new page in the same category, for simplicity. Can move it elsewhere,
+          // change page type, etc, later.
+
+          val newPageRes: (PagePathWithId, Opt[ReviewTask]) = this.createPageNoBody_ifAuZ(
+                  PageType.Discussion,
+                  PageStatus.Published,
+                  anyCategoryId = fromPage.categoryId,  // same, see comment above
+                  anySlug = None,
+                  title = TitleSourceAndHtml.alreadySanitized("New Page", safeHtml = "New Page"),
+                  // Should the person who moves the post, become the page author?
+                  // Or should the author be the author of the original post?
+                  // Maybe the page & title author can be the mover, and the original
+                  // post author is of course the commment author, unchanged.
+                  byWho = reqrAndMover.reqrToWho,
+                  // Not yet supported, when moving posts to a new page.
+                  asAlias = {
+                    dieIf(postAuthor.isAnon, "TyE703KSLFC")
+                    None
+                  },
+                  // Later: Generate more specific notifications here, instead?
+                  skipNotfsAndAuditLog = true,
+                  )(tx, staleStuff)
+          newPageDao(newPageRes._1.pageId, tx)
+      }
+
+      val movingOnSamePage =  anyNewParent.exists(_.pageId == postToMove.pageId)
 
       // Don't create cycles.
       TESTS_MISSING // try to create a cycle?  tested here?: [TyTMOVEPOST692]
-      if (newParentPost.pageId == postToMove.pageId) {
-        val ancestorsOfNewParent = fromPage.parts.ancestorsParentFirstOf(newParentPost.nr)
+      if (movingOnSamePage) {
+        val ancestorsOfNewParent = fromPage.parts.ancestorsParentFirstOf(
+                anyNewParentPost.getOrDie("TyEJ6PK2PL9").nr)
         if (ancestorsOfNewParent.exists(_.id == postToMove.id))
           throwForbidden("EsE7KCCL_", o"""Cannot move a post to after one of its descendants
                 — doing that, would create a cycle""")
@@ -3109,34 +3249,80 @@ trait PostsDao {
         // cannot create a cycle.
       }
       else {
-        // If moving anonymous posts, it's higher risk that someone accidentally
-        // reveals who hen is, e.g. by making all posts by an anonym of hens,
-        // public, supposedly on a single page — but having forgotten / not-knowing-that
-        // others will be able to see / might-deduce-that hen also wrote [the post that got
+        // If moving anonymous posts to *another page* (or a new page?), it's higher risk that
+        // someone accidentally reveals who han is, e.g. by making all posts by an anonym of
+        // hans, public, supposedly on a single page — but having forgotten / not-knowing-that
+        // others will be able to see / might-deduce-that han also wrote [the post that got
         // moved to another page].
-        // So, for now, disallow this. (Could allow, if the author deanonymizes the post.)
+        // So, for now, disallow this. (Could allow, if the author deanonymizes the post,
+        // or if there's some reminder/notification that "This will also deanonymize
+        // this comment on another page: ..."?)
         TESTS_MISSING // Verify this not allowed.  TyTMOVANONCOMT
         throwForbiddenIf(postAuthor.isAnon, "TyE4MW2LR5",
               "Cannot move an anonymous post to another page")
       }
 
       val moveTreeAuditEntry = AuditLogEntry(
-        siteId = siteId,
-        id = AuditLogEntry.UnassignedId,
-        didWhat = AuditLogEntryType.MovePost,
-        doerTrueId = moverId,
-        doneAt = now.toJavaDate,
-        browserIdData = browserIdData,
-        pageId = Some(postToMove.pageId),
-        uniquePostId = Some(postToMove.id),
-        postNr = Some(postToMove.nr),
-        targetPageId = Some(newParentPost.pageId),
-        targetUniquePostId = Some(newParentPost.id),
-        targetPostNr = Some(newParentPost.nr))
+            siteId = siteId,
+            id = AuditLogEntry.UnassignedId,
+            didWhat = AuditLogEntryType.MovePost,
+            doerTrueId = reqrAndMover.reqr.trueId2,
+            doneAt = now.toJavaDate,
+            browserIdData = reqrAndMover.browserIdData,
+            pageId = Some(postToMove.pageId),
+            uniquePostId = Some(postToMove.id),
+            postNr = Some(postToMove.nr),
+            targetPageId = Some(toPage.id),
+            targetUniquePostId = anyNewParentPost.map(_.id),
+            targetPostNr = anyNewParentPost.map(_.nr))
+
+      // [if_mv_post_upd_type]
+      // (This got a bit over complicated. Woudl be better with flags instead  [post_flag_or_type]
+      // of post types?)
+      // (Note: Can only move posts that are: isComment, isChat or isWiki. [can_mv_post])
+      val postTypeAfter =
+            if (postToMove.tyype.isWiki) {
+              // Don't _forget_wiki_status status.
+              UNTESTED // move wiki post to chat page. Move comment with wiki descendant to chat.
+              postToMove.tyype
+            }
+            else if (createNewPage) {
+              // The orig post is of type Normal, by default.
+              // (Also chat page orig posts are of type Normal — namely info about
+              // what the chat is for, not a real chat message.)
+              PostType.Normal
+            }
+            else if (toPage.pageType.isChat) {
+              // Currently, should be only chat messages on chat pages (and maybe wiki posts,
+              // see don't _forget_wiki_status above).
+              PostType.ChatMessage
+            }
+            else if (anyNewParentPost.get.isOrigPost) {
+              if (fromPage.pageType.isChat) {
+                // If moving chat comments to another page, under the orig post, they'll
+                // become normal discussion replies.
+                PostType.Normal
+              }
+              else {
+                // Otherwise, keep their current type, whatever that is. So e.g. Progress
+                // replies become Progress replies on the new page (`toPage`) too.
+                postToMove.tyype
+              }
+            }
+            else {
+              // Change type (if needed) so fits in where it'll be hereafter. For example,
+              // if moving comments of type Flat? from the progress section to somewhere inside
+              // a thread on a discussion page (as nested replies, not orig post replies),
+              // they'll get new type Normal, "inherited" fromm their new parent.
+              // (Unless it's a wiki post — we don't _forget_wiki_status.)
+              anyNewParentPost.get.tyype
+            }
 
       val postAfter =
-        if (postToMove.pageId == newParentPost.pageId) {
-          val postAfter = postToMove.copy(parentNr = Some(newParentPost.nr))
+        if (movingOnSamePage) {
+          val postAfter = postToMove.copy(
+                parentNr = Some(anyNewParentPost.getOrDie("TyE4SL5W7").nr),
+                tyype = postTypeAfter)
           tx.updatePost(postAfter)
           // (Need not reindex.)
           tx.insertAuditLogEntry(moveTreeAuditEntry)
@@ -3148,7 +3334,15 @@ trait PostsDao {
 
           val descendants = fromPage.parts.descendantsOf(postToMove.nr)
           val newNrsMap = mutable.HashMap[PostNr, PostNr]()
-          val firstFreePostNr = toPage.parts.highestReplyNr.map(_ + 1) getOrElse FirstReplyNr
+          val firstFreePostNr =
+                if (createNewPage) {
+                  // We didn't create any orig post, when we created the page. So BodyNr is
+                  // still available. And we want the post we're moving to be the orig post.
+                  PageParts.BodyNr
+                }
+                else {
+                  toPage.parts.highestReplyNr.map(_ + 1) getOrElse FirstReplyNr
+                }
           var nextPostNr = firstFreePostNr
           newNrsMap.put(postToMove.nr, nextPostNr)
           for (descendant <- descendants) {
@@ -3157,9 +3351,10 @@ trait PostsDao {
           }
 
           val postAfter = postToMove.copy(
-            pageId = newParentPost.pageId,
-            nr = firstFreePostNr,
-            parentNr = Some(newParentPost.nr))
+                pageId = toPage.id,
+                nr = firstFreePostNr,
+                parentNr = anyNewParentPost.map(_.nr),
+                tyype = postTypeAfter)
 
           val postsAfter = ArrayBuffer[Post](postAfter)
           val auditEntries = ArrayBuffer[AuditLogEntry](moveTreeAuditEntry)
@@ -3169,15 +3364,48 @@ trait PostsDao {
               pageId = toPage.id,
               nr = newNrsMap.get(descendant.nr) getOrDie "EsE7YKL32",
               parentNr = Some(newNrsMap.get(
-                descendant.parentNr getOrDie "EsE8YKHF2") getOrDie "EsE2PU79"))
+                    descendant.parentNr getOrDie "EsE8YKHF2") getOrDie "EsE2PU79"),
+              tyype =
+                    // Update type, unless it's sth special like a wiki (later, will be
+                    // a wiki flag instead), or bookmarks [mv_bookmarked_post].
+                    //
+                    // This got a bit over complicated. Better w/o the Progress section,
+                    // and w/o PostType.Flat / BottomComment?  [post_flag_or_type]
+                    // Or at least if it was just a flag, not a different type?
+                    //
+                    if (descendant.tyype.isChat || descendant.tyype.isComment) {
+                      if (toPage.pageType.isChat) {
+                        PostType.ChatMessage
+                      }
+                      else if (postToMove.tyype.isWiki) {
+                        // "Inherit" the type of the parent of postToMove, or if none
+                        // (moving to a new page), just use type Normal.
+                        val t: PostType = anyNewParentPost.map(_.tyype) getOrElse PostType.Normal
+                        // But what if the parent is a wiki post too! Later, better solve that
+                        // by just look at only the page type instead. [post_flag_or_type]
+                        if (!t.isWiki) t else descendant.tyype
+                      }
+                      else {
+                        // If the post-to-move hereafter will be Normal, Flat or BottomComment,
+                        // use the same type for the descendants.
+                        postTypeAfter
+                      }
+                    }
+                    else {
+                      // Keep unchanged, e.g. wiki or bookmark.
+                      UNTESTED // Move wiki descendant to chat.
+                      UNTESTED // Move bookmarked post. [mv_bookmarked_post]
+                      descendant.tyype
+                    })
+
             postsAfter += descendantAfter
             auditEntries += AuditLogEntry(
               siteId = siteId,
               id = AuditLogEntry.UnassignedId,
               didWhat = AuditLogEntryType.MovePost,
-              doerTrueId = moverId,
+              doerTrueId = reqrAndMover.reqr.trueId2,
               doneAt = now.toJavaDate,
-              browserIdData = browserIdData,
+              browserIdData = reqrAndMover.browserIdData,
               pageId = Some(descendant.pageId),
               uniquePostId = Some(descendant.id),
               postNr = Some(descendant.nr),
@@ -3187,6 +3415,7 @@ trait PostsDao {
           }
 
           postsAfter foreach tx.updatePost
+          // Reindex any moved bookmark too? [mv_bookmarked_post]
           tx.indexPostsSoon(postsAfter.to(Vec): _*)
 
           // Uncache backlinked pages. [uncache_blns]
@@ -3213,16 +3442,22 @@ trait PostsDao {
 
           auditEntries foreach tx.insertAuditLogEntry
           tx.movePostsReadStats(fromPage.id, toPage.id, Map(newNrsMap.toSeq: _*))
+
           // Mark both fromPage and toPage sections as stale, in case they're different forums.
-          refreshPageMetaBumpVersion(fromPage.id, markSectionPageStale = true)(tx)
+          refreshPageMetaBumpVersion(fromPage.id, markSectionPageStale = true,
+                updateBumpedAt = false)(tx)
+          // This counts the page body too, if earlier `numPostsTotal` was 1. [page_no_body]
           refreshPageMetaBumpVersion(toPage.id, markSectionPageStale = true,
                 // And people interested in the moved-to page might not have seen
                 // the comment being moved, so move the page to the top of the activity list:
-                newBumpedAt = Some(tx.now))(tx)
+                updateBumpedAt = !createNewPage,
+                newBumpedAt = if (createNewPage) None else Some(tx.now))(tx)
 
           BUG; SHOULD // update popularity stats, for from & to pages?  See: [dupl_upd_pg_stats]
           // dao.updatePagePopularity(... fromPage ..., tx)
           // dao.updatePagePopularity(... toPage ..., tx)
+          // updatePagePopularity(  — if new page, everything preloaded?
+          //    PreLoadedPageParts(pageMeta, Vector(titlePost, bodyPost, ...descendants)), tx)
 
           postAfter
         }
@@ -3248,7 +3483,7 @@ trait PostsDao {
   }
 
 
-  def loadThingsToReview(): ThingsToReview = {
+  private def _loadThingsToReview_unused(): ThingsToReview = {  // DELETE
     readOnlyTransaction { tx =>
       val posts = tx.loadPostsToReview()
       val pageMetas = tx.loadPageMetas(posts.map(_.pageId))

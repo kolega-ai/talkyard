@@ -86,6 +86,8 @@ trait SiteTransaction {   RENAME // to SiteTx — already started with a type Si
   def loadAboutCategoryPageId(categoryId: CategoryId): Option[PageId]
 
   def loadPost(uniquePostId: PostId): Option[Post]   ; RENAME; QUICK // to loadPostById
+  def loadPostById(postId: PostId): Opt[Post] = loadPost(postId)
+
   def loadThePost(uniquePostId: PostId): Post =     // RENAME; QUICK // to loadPostById
     loadPost(uniquePostId).getOrElse(throw PostNotFoundByIdException(uniquePostId))
 

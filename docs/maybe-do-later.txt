@@ -126,6 +126,40 @@ Maybe split "Wikify" into "Wikify text" and "Wikify properties" and "Wikify all"
 There could be a separate: May-wikify-own-posts permission,  and May-wikify-others-posts?
 Indicating that somwhat granular permission control of a posts props can make sense?
 
+[wiki_flag_or_type]
+Maybe there shouldn't be any wiki post type, instead an is-wiki bool flag?
+
+[post_flag_or_type]
+To do: Use PostType.Talk for orig posts, comments, chat messages.
+And if the page type is Chat, posts on that page gets interpreted as chat messages.
+But stop using PostType.ChatMessage, is just dupl data that needs to be kept in sync
+w the page type. HOWEVER, when indexing in ElasticSearch, it can be nice with a field that
+says if it's a chat message, discussion comment or orig post. But only in ElasticSearch,
+not in Postgres! (For advanced search options.)
+  Maybe in the diiistant future, we can allow different type of discussion embedded
+inside another type of discussion.
+  For example, in a chat, let people start an inline *discussion* sub thread (not chat)
+about something, without creating a new page? Those who want, can view the sub discussion
+on a page of its own?  — Or maybe such a sub discussion *should* be a separate page,
+of type Discussion, it's just that the first parts of it, can be inlined in the chat,
+and a Click-to-expand button? But what if you *move* a threaded discussion sub tree
+to a chat page.  Then, should they change to chat messages?  Or remain threaded?
+Maybe need to do the everything-is-a-node refactoring first  [its_a_node]
+— then, there'll be just one type field for both pages and posts, problem "gone"?
+And the default type could be Inherit, meaning, a post inherits the type of [its closest
+ancestor with an inheritable type].  Maybe Chat vs Discussion should be
+a layout property, not part of PostType at all!
+Discussion structure: Chat / Threaded.  ?
+Discussion purpose: Question / Idea / Problem / Discussion / Decision
+Discussion phase: Different phases, when mitigating biases.
+There's already:  comt_nesting_c  and  comt_nesting_c.  Maybe  comt_nesting_c
+(Chat and Discussion would be inheritable,
+but e.g. PostType.CompletedForm or PostType.MetaMessage wouldn't be inheritable.
+Idea, Question, Problem maybe should be another field — maybe should split
+PageType into layout + content, and ).
+And if intentionally setting it to sth else, then, it's that other type, no matter the type
+of the parent page?
+
 [page_props_perms]
 If pat 1) may edit the Orig Post text, and if pat 2) may change the page type, doing-status
 etc, maybe should be different permissions? Or not?

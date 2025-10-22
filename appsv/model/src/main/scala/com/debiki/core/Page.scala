@@ -534,12 +534,22 @@ case class PageMeta( // ?RENAME to Page? And rename Page to PageAndPosts?  [exp]
       closedAt = newClosedAt)
   }
 
-  def copyWithUpdatedStats(page: Page, newBumpedAt: Opt[When] = None): PageMeta = {
+  /**
+    * @param updateBumpedAt If true, bumpedAt is set to the date of the most recent comment,
+    * or, `newBumpedAt`, if specified.
+    * @param newBumpedAt
+    */
+  def copyWithUpdatedStats(page: Page, updateBumpedAt: Bo = true,
+          newBumpedAt: Opt[When] = None): PageMeta = {
+    require(newBumpedAt.isEmpty || updateBumpedAt, "Ty5N602RKJS")
+
     val body = page.parts.body
     def bodyVotes(fn: Post => Int): Int = body.map(fn) getOrElse 0
 
     val newMeta = copy(
-      bumpedAt = newBumpedAt.map(_.toJavaDate) orElse When.anyJavaDateLatestOf(
+      bumpedAt =
+          if (!updateBumpedAt) this.bumpedAt
+          else newBumpedAt.map(_.toJavaDate) orElse When.anyJavaDateLatestOf(
             bumpedAt, page.parts.lastVisibleReply.map(_.createdAt)),
       lastApprovedReplyAt = page.parts.lastVisibleReply.map(_.createdAt),
       lastApprovedReplyById = page.parts.lastVisibleReply.map(_.createdById),

@@ -124,6 +124,7 @@ describe("admin-review-cascade-approval  TyT0SKDE24", () => {
   });
 
   it("... but deletes this one  TyT052SKDGJ37", () => {
+    // Ooops!  .s_C_M_B-Dl  gone.
     merchesBrowser.chat.deleteChatMessageNr(c.FirstReplyNr + 1);
   });
 
