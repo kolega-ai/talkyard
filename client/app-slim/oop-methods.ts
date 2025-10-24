@@ -554,6 +554,7 @@ export function votes_includes(votes: Vote[], voteType: PostVoteType): Bo {
 
 
 export function post_isReply(post: Post): Bo {
+  dieIf(post.nr >= 0 && post.postType === PostType.Bookmark, 'TyE502TKJ3');
   return post.nr >= FirstReplyNr &&
           post.postType !== PostType.MetaMessage &&
           post.postType !== PostType.CompletedForm;
