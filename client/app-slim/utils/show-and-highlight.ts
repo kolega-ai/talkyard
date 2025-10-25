@@ -124,13 +124,16 @@ export function flashPostNrIfThere(nr: PostNr) {
 export function flashPostElem(postElem: Element) {
   const head = postElem.querySelector('.dw-p-hd');
   const body = postElem.querySelector('.dw-p-bd');
-  flashPostImpl(head, body);
+  // If it's a meta post ('.s_MP' e.g. "@usernaem deleted this page"), there's no head or
+  // body, instead we'll flash the whole postElem.
+  const headOrMetaPost = head || (body ? null : postElem);
+  flashPostImpl(headOrMetaPost, body);
 }
 
 
 const highlightOffHandles = new Map();
 
-function flashPostImpl(head: Element | undefined, body: Element) {
+function flashPostImpl(head: Element | NU, body: Element | U) {
   if (!head && !body) {
     // Fyi: This happens if you start writing a new comment, scroll up, click Show-preview,
     // to scroll to the preview. Then, cancel editing the comment, so the preview
@@ -154,7 +157,11 @@ function flashPostImpl(head: Element | undefined, body: Element) {
   else if (!body) {
     // Fyi: If post deleted, there's no body — only a post header that
     // says sth like "Post deleted".
+    // Or if it's a meta post, e.g. "@usernaem deleted this page".
   }
+
+  const alwaysElm: Element = head || body;
+  const maybeElm: Element | NU = head ? body : null;
 
   const highlightOnClass = 's_Fx-Flash';
   const highlightOffClass = 's_Fx-Flash-End';
@@ -166,40 +173,33 @@ function flashPostImpl(head: Element | undefined, body: Element) {
 
   // Remove the fade-out class, otherwise cannot highlight again until the
   // flade-out animation has ended.
-  if (head) {
-    $h.removeClasses(head, allClasses);
-    $h.addClasses(head, highlightOnClass);
-  }
-  if (body) {
-    $h.removeClasses(body, allClasses);
-    $h.addClasses(body, highlightOnClass);
+  $h.removeClasses(alwaysElm, allClasses);
+  $h.addClasses(alwaysElm, highlightOnClass);
+  if (maybeElm) {
+    $h.removeClasses(maybeElm, allClasses);
+    $h.addClasses(maybeElm, highlightOnClass);
   }
 
-  // Simplified flash, if no body.
-  if (!body) {
-    setTimeout(function() {
-      $h.removeClasses(head, allClasses);
-    }, durationSeconds * 1000);
-    return;
-  }
-
-  const oldHighlOffHandle = highlightOffHandles.get(body);
+  const oldHighlOffHandle = highlightOffHandles.get(alwaysElm);
   if (oldHighlOffHandle) {
     clearTimeout(oldHighlOffHandle);
-    highlightOffHandles.delete(body);
+    highlightOffHandles.delete(alwaysElm);
   }
 
   setTimeout(function() {
-    if (head) $h.addClasses(head, highlightOffClass);
-    $h.addClasses(body, highlightOffClass);
+    // But what happens if `alwaysElm` now has gotten removed from the html, if we
+    // navigated to another page? I suppose worst case is some browser error log message.
+
+    $h.addClasses(alwaysElm, highlightOffClass);
+    if (maybeElm) $h.addClasses(maybeElm, highlightOffClass);
     // At least Chrome returns 'Xs', e.g. '1.5s', regardles of the units in the CSS file.
     const highlOffHandle = setTimeout(function() {
-      highlightOffHandles.delete(body);
-      if (head) $h.removeClasses(head, allClasses);
-      $h.removeClasses(body, allClasses);
+      highlightOffHandles.delete(alwaysElm);
+      if (maybeElm) $h.removeClasses(maybeElm, allClasses);
+      $h.removeClasses(alwaysElm, allClasses);
     }, durationSeconds * 1000);
 
-    highlightOffHandles.set(body, highlOffHandle);
+    highlightOffHandles.set(alwaysElm, highlOffHandle);
   }, 700);
 }
 

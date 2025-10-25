@@ -74,7 +74,7 @@ export var Metabar = createComponent({
   // Scrolls to & highlights the most recent comment.
   goToLatest: function() {
     const store: Store = this.state.store;
-    const maxNr = page_mostRecentPostNr(store.currentPage);
+    const maxNr = page_mostRecentReplyNr(store.currentPage) || BodyNr;
     ReactActions.loadAndShowPost(maxNr);
   },
 

@@ -29,7 +29,8 @@
 
 .dw-p-hd,
 .dw-p.dw-zd,  // folded comment
-.DW.DW .dw-p-hd.s_Fx-Flash-End
+.DW.DW .s_Fx-Flash-End.dw-p-hd,
+.DW.DW .s_Fx-Flash-End.s_MP  // meta post
   color: hsl(0, 0%, 8%);
   background-color: white
 
@@ -1072,7 +1073,8 @@ html.touch .dw-p-mark-click
 
   // Posts
   &.dw-p-hd,
-  &.dw-p-bd
+  &.dw-p-bd,
+  &.s_MP // meta post
     background-color: hsl($uiHue, 100%, 83%);
     // Place -bd background above action buttons.
     z-index: 1;
@@ -1132,13 +1134,13 @@ $metaPostMarignBottom = 35px;
     margin-right: 2px;
 
   // Align with normal posts... also if (7UKBQP2)
-  //margin-left: $avatarSpace;  — no, looks as if the meta message is a reply to any OP reply above.
-  margin-left: 13px;  // this looks better & makes it clear the meta message isn't a repy to sth.
+  //margin-left: $avatarSpace;  — no, looks as if the meta post is a reply to any OP reply above.
+  margin-left: 13px;  // this looks better & makes it clear the meta post isn't a repy to sth.
 
 .esPage-Compact
   .s_MP
     // The big OP-reply avatar width is 36px (2G5KW8), and the MP .esAvtr-tny width is 28px [7UKWQ1],
-    // so to center-align the meta-message tiny avatar with [the OP reply big avatar], add this margin:
+    // so to center-align the meta post tiny avatar with [the OP reply big avatar], add this margin:
     margin-left: 4px;   // ... narrow screens (7UKBQP2)
 
 

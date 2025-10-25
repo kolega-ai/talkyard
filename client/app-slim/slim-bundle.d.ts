@@ -533,7 +533,7 @@ declare namespace debiki2 {
   function page_isSolved(page: Page | Topic): Bo;
   function page_canBeSolved(page: Page | Topic): Bo;
   function page_canChangeCategory(page: Page): boolean;
-  function page_mostRecentPostNr(page: Page): number;
+  function page_mostRecentReplyNr(page: Page): PostNr;
 
   function node_deriveLayout(props: DiscLayoutDropdownBtnProps): NodePropsDerivedAndDefault;
   function discProps_pluckFrom(source: DiscPropsSource): DiscPropsSource;
