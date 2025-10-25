@@ -7,7 +7,7 @@ html.es-chat
   #dwPosts
     flex: none;
 
-  &:not(.dw-react-started) #dwPosts
+  &.js:not(.dw-react-started) #dwPosts
     visibility: hidden; // avoids flash of not-yet-scrolled-to-bottom message list
 
   .esPage > .container
@@ -16,6 +16,9 @@ html.es-chat
     @media (min-width: $narrowLimit + 1)
       padding-left: 35px !important;
 
+// Undo a display: none that's only if javascript enabled.
+html:not(.js) .esLastChatMsgs
+  display: block !important;
 
 .esChatChnl_about
   margin: 10px 0 30px;
