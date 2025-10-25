@@ -79,6 +79,18 @@ export var PageRoleDropdown = createComponent({
     const me: Myself = store.me;
     const showAllOptions = state.showAllOptions;
 
+    // Shouldn't try to change the type of private discussions to something not-private.
+    // (There's a server side check: [0_change_page_type].)
+    const canChangeType =
+            pageRole !== PageRole.PrivateChat && pageRole !== PageRole.FormalMessage;
+    if (!canChangeType) {
+      // Don't show any change-topic-type dropdown button:
+      return null;
+      // Could, but looks confusing I think — like a button you can't click:
+      // return r.div({ className: 'esTopicType_dropdown btn btn-default' },
+      //     pageRole_toIconString(pageRole));
+    }
+
     // Don't allow changing already existing topics, to chat topics, because chat
     // topics are "totally" different from "normal" topics like
     // discussions/ideas/questions etc. Chat topic types, may be selected only
@@ -89,25 +101,25 @@ export var PageRoleDropdown = createComponent({
       Button({ onClick: this.open, ref: 'dropdownButton', className: 'esTopicType_dropdown' },
         pageRole_toIconString(pageRole), ' ', r.span({ className: 'caret' }));
 
-    const discussionOption = isChatAlready ? null :
+    const discussionOption = isChatAlready && !showAllOptions ? null :
       ExplainingListItem({ onSelect: this.onSelect, id: 'te_DiscO',
         activeEventKey: pageRole, eventKey: PageRole.Discussion,
         title: PageRole_Discussion_IconString,
         text: t.pt.DiscussionExpl });
 
-    const questionOption = isChatAlready ? null :
+    const questionOption = isChatAlready && !showAllOptions ? null :
       ExplainingListItem({ onSelect: this.onSelect, id: 'e2eTTD_QuestionO',
         activeEventKey: pageRole, eventKey: PageRole.Question,
         title: PageRole_Question_IconString,
         text: r.span({}, t.pt.QuestionExpl) });
 
-    const problemOption = isChatAlready ? null :
+    const problemOption = isChatAlready && !showAllOptions ? null :
       ExplainingListItem({ onSelect: this.onSelect, id: 'e2eTTD_ProblemO',
         activeEventKey: pageRole, eventKey: PageRole.Problem,
         title: PageRole_Problem_IconString,
         text: t.pt.ProblExpl });
 
-    const ideaOption = isChatAlready ? null :
+    const ideaOption = isChatAlready && !showAllOptions ? null :
       ExplainingListItem({ onSelect: this.onSelect, id: 'e2eTTD_IdeaO',
         activeEventKey: pageRole, eventKey: PageRole.Idea,
         title: PageRole_Idea_IconString,
@@ -116,7 +128,9 @@ export var PageRoleDropdown = createComponent({
     // const wikiOption = ...
 
     // Toggling between the two open chat types, AnyoneChat and StandardChat, is fine.
-    const chatOptions = (props.pageExists && !page_isOpenChat(pageRole)) ||
+    // If the page is not a chat, one needs to click More... to see the chat options
+    // (changing from not-a-chat to a-chat is very rarely done).
+    const chatOptions = (props.pageExists && !page_isOpenChat(pageRole) && !showAllOptions) ||
             user_isGuest(me) || settings.enableChat === false ? null :
         rFr({},
           ExplainingListItem({ onSelect: this.onSelect, id: 'e2eTTD_OpenChatO',
@@ -149,13 +163,13 @@ export var PageRoleDropdown = createComponent({
     // ----- Staff only
 
     const showMore =
-            !isStaff(me) || props.hideStaffOnly || showAllOptions || isChatAlready ?  null :
+            !isStaff(me) || props.hideStaffOnly || showAllOptions ?  null :
       ExplainingListItem({ onClick: this.showAllOptions,
         title: r.span({ className: 'esPageRole_showMore' }, t.MoreDots) });
 
 
-    let staffOnlyDivider;
-    let infoPageOption;
+    let staffOnlyDivider: RElm | U;
+    let infoPageOption: RElm | U;
 
     if (isStaff(me) && !props.hideStaffOnly && !isChatAlready) {
       staffOnlyDivider =
@@ -174,9 +188,9 @@ export var PageRoleDropdown = createComponent({
 
     // ----- Admin only
 
-    let adminOnlyDivider;
-    let formOption;
-    let customHtmlPageOption;
+    let adminOnlyDivider: RElm | U;
+    let formOption: RElm | U;
+    let customHtmlPageOption: RElm | U;
     if (me.isAdmin && showAllOptions && !isChatAlready) {
       adminOnlyDivider = r.div({ className: 'esDropModal_header' }, "Only for admins:");
 
@@ -202,18 +216,24 @@ export var PageRoleDropdown = createComponent({
         r.div({ className: 'esDropModal_header'}, t.pt.SelectTypeC),
         r.ul({ className: 'esTopicType' },
 
+          !isChatAlready ? null : rFr({},
+              chatOptions,
+              showMore),
+
           discussionOption,
           questionOption,
           problemOption,
           ideaOption,
-          chatOptions,
+
+          !isChatAlready ? rFr({},
+              showMore,
+              chatOptions) : null,
+
           //wikiMindMap,
 
           staffOnlyDivider,
           privateChatOption,
           infoPageOption,
-
-          showMore,
 
           adminOnlyDivider,
           formOption,

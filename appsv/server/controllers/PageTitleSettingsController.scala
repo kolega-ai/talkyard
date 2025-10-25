@@ -161,7 +161,7 @@ class PageTitleSettingsController @Inject()(cc: ControllerComponents, edContext:
     throwForbiddenIf(oldMeta.pageType == PageType.AboutCategory,  //  [4AKBE02]
       "TyEEDCATDSCTTL", "Don't edit the category description topic title — edit the topic text instead")
 
-    // Maybe can be ok to change from Forum to Blog or Wiki, some time in the future. [_0_change_type]
+    // Maybe could allow changing from Forum to Blog or Wiki.  [0_change_page_type]
     throwForbiddenIf(pageTypeAfter != oldMeta.pageType && !oldMeta.pageType.mayChangeRole,
       "DwE5KGU02", s"Cannot change page role ${oldMeta.pageType} to something else")
 
@@ -187,7 +187,7 @@ class PageTitleSettingsController @Inject()(cc: ControllerComponents, edContext:
         throwForbidden("TyECHFORUMCAT2", "Cannot change forum page root category id")
       }
 
-      // Also, cannot change from PageType.Forum, see [_0_change_type] above,
+      // Also, cannot change from PageType.Forum, see [0_change_page_type] above,
       // and cannot set any Doing status, see [_0_change_doing_status].
     }
     else {
