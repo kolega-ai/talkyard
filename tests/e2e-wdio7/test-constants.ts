@@ -196,6 +196,7 @@ export default {
   SquashSiblingIndexLimitDepth1: 12,
   SquashSiblingIndexLimitDepth2: 12 / 2,
   SquashSiblingIndexLimitDepth3: 12 / 4,
+  ProgressLayoutEnabled: 1,
   UnknownUserId: -3,
   NoUserId: 0,
   SystemUserId: 1,

@@ -40,6 +40,11 @@ describe(`move-posts-same-page.2br.d  TyT03946HET3`, () => {
       title: "Some E2E Test",
       members: undefined, // default = everyone
     });
+
+    builder.settings({
+      progressLayout: c.ProgressLayoutEnabled,
+    });
+
     function addOnePost(nr: PostNr, parentNr: PostNr, text: string, postType?: PostType) {
       builder.addPost({
         page: forum.topics.byMichaelCategoryA,
@@ -143,7 +148,8 @@ describe(`move-posts-same-page.2br.d  TyT03946HET3`, () => {
     })
   }
 
-  it("Moves the three first replies to the Progress section: 1) Opens Move dialog", async () => {
+  it(`Moves the 3 first replies to the Progress section: 1) Opens Move dialog  TyTMVPO_2PROGSEC`,
+          async () => {
     await owen_brA.topic.openMoveDialogForPostNr(c.FirstReplyNr + 0);
   });
 

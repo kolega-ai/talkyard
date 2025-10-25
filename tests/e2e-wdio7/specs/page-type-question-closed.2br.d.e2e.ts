@@ -48,6 +48,8 @@ describe(`page-type-question-closed.2br.d  TyTPATYQUESTCLOSD`, () => {
 
   it("Import a site", async () => {
     const site: SiteData = make.forumOwnedByOwen('ptqst', { title: "Page type Question test" });
+    // We add a _Progress_Note below.
+    site.settings.progressLayout = c.ProgressLayoutEnabled;
     site.members.push(corax);
     site.members.push(maria);
     site.members.push(michael);
@@ -149,6 +151,7 @@ describe(`page-type-question-closed.2br.d  TyTPATYQUESTCLOSD`, () => {
   });
 
   it("... and post a progress reply", async () => {
+    // _Progress_Note:
     await mariasBrowser.complex.addProgressReply(
           "Thanks everyone! An otter then, a bath tube, and fish.")  // nr 12
   });

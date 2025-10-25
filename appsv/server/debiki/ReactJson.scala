@@ -510,7 +510,6 @@ class JsonMaker(dao: SiteDao) {
       "forumSearchBox" -> JsNum32OrNull(page.meta.forumSearchBox),
       "forumMainView" -> JsNum32OrNull(page.meta.forumMainView),
       "forumCatsTopics" -> JsNum32OrNull(page.meta.forumCatsTopics),
-      "progressLayout" -> JsNumber(siteSettings.progressLayout.toInt),
       "origPostVotes" -> JsNumber(page.parts.origPostVotes.toInt),
       "enableDisagreeVote" -> JsBoolean(page.parts.enableDisagreeVote),
       "origPostReplyBtnTitle" -> JsStringOrNull(page.parts.origPostReplyBtnTitle),

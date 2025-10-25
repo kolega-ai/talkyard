@@ -88,6 +88,7 @@ export = {
   MaxTitleLength: 200,    // sync with Scala
   BodyNr: 1,
   FirstReplyNr: 2,  // [5FKF0F2]
+  ProgressLayoutEnabled: 1,
   UnknownUserId: -3,
   NoUserId: 0,
   SystemUserId: 1,

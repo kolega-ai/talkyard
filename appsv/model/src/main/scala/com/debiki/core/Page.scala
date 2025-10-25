@@ -1049,8 +1049,12 @@ sealed abstract class ProgressLayout(val IntVal: Int) {
   def toInt: Int = IntVal
 }
 
+/** No one uses this like I had thought — seems sometimes people click Add Progress Note
+  * mostly by mistake, as if it was a Reply button. So, now disabled by default.
+  */
 @deprecated("This was too complicated?")
 object ProgressLayout {
+  /** The default is MostlyDisabled, from v0.2025.012 and onwards. */
   object Default extends ProgressLayout(0)
   object Enabled extends ProgressLayout(1)
   object MostlyDisabled extends ProgressLayout(2)

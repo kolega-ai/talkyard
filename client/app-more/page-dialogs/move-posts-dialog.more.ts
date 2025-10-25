@@ -159,18 +159,23 @@ const MovePostsDialog = createComponent({
   },
 
   render: function () {
-    let content;
+    // Tests:
+    //   - See /^ *move post TyTMOPO/ in tests-map.txt.
+
+    let content: RElm | U;
     const state: MovePostsDiagState = this.state;
 
     if (state.isOpen) {
       const post: Post = state.post;
       const isTopLevelReply = post.parentNr === BodyNr;
       const isChat = post.postType === PostType.ChatMessage;
-      let showMoveToOtherSection = post_isReply(post) && isTopLevelReply;
 
-      // Let's get rid of the progress posts? They just make people confused?
-      if (post.postType !== PostType.Flat)
-        showMoveToOtherSection = false;
+      const settings: SettingsVisibleClientSide = state.store.settings;
+      const showMoveToOtherSection = post_isReply(post) && isTopLevelReply &&
+                (settings.progressLayout === ProgressLayout.Enabled
+                    // For changing an accidenal Progress Note to a normal discussion reply.
+                    || post.postType === PostType.Flat
+                    || post.postType === PostType.BottomComment);
 
       const showMoveToNewPage = post_isReply(post); // [can_mv_post]
       const otherSection = post.postType === PostType.BottomComment ? "discussion" : "progress";

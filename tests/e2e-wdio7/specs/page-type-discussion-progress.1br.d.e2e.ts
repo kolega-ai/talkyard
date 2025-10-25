@@ -41,6 +41,8 @@ describe("page-type-discussion-progress.1br.d  TyTPATYDISC", () => {
 
   it("Import a site", async () => {
     const site: SiteData = make.forumOwnedByOwen('pgstbc', { title: "Emb Cmts Disc Id Test" });
+    // We add a _Progress_Note below.
+    site.settings.progressLayout = c.ProgressLayoutEnabled;
     site.members.push(maria);
     site.members.push(michael);
     idAddress = await server.importSiteData(site);
@@ -81,6 +83,7 @@ describe("page-type-discussion-progress.1br.d  TyTPATYDISC", () => {
 
   it("Maria posts a progress reply", async () => {
     // c.FirstReplyNr + 2 = #post-4
+    // _Progress_Note:
     await mariasBrowser.complex.addProgressReply(bottomCommentOneText);
   });
 
@@ -104,6 +107,7 @@ describe("page-type-discussion-progress.1br.d  TyTPATYDISC", () => {
   });
 
   it("Posts another progress reply", async () => {
+    // _Progress_Note:
     await mariasBrowser.complex.addProgressReply(bottomCommentTwoText);  // #post-9
   });
 

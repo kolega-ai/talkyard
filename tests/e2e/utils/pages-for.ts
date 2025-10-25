@@ -2698,7 +2698,7 @@ export class TyE2eTestBrowser {
 
     assertUrlIs(expectedUrl: string) {
       let url = this.#br.getUrl();
-      assert(url === expectedUrl);
+      tyAssert.eq(url, expectedUrl);
     }
 
     goToSearchPage(query?: string) {

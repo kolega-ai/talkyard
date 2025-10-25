@@ -61,6 +61,9 @@ describe("new user, review, ok   TyT39657MRDT2", () => {
     // limits), and they'll be shown directly — but the first 2 will be enqueued for review
     // by staff.
     site.settings.numFirstPostsToReview = 2;
+    // We add _Progress_Notes below.
+    site.settings.progressLayout = c.ProgressLayoutEnabled;
+
     site.members.push(maja);
 
     let page = make.page({
@@ -272,6 +275,7 @@ describe("new user, review, ok   TyT39657MRDT2", () => {
   });
 
   it("... the guest posts two more replies to the orig post", () => {
+    // _Progress_Notes:
     guestsBrowser.complex.addProgressReply(guestsSecondReplyBecomesPostNr7);
     guestsBrowser.complex.addProgressReply("I'm a guest, my 3rd reply, post nr 8.");
     guestsBrowser.topic.assertPostNotPendingApproval(6);

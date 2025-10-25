@@ -1437,6 +1437,9 @@ interface SettingsVisibleClientSide extends TopicInterfaceSettings, SettingsDisc
   watchbarStartsOpen?: boolean;         // default: true
   showSocialButtons?: boolean;          // default: undefined —> false
   facebookAppId?: string;               // default: undefined —> no FB insight statistics
+
+  // Deprecated:
+  progressLayout?: ProgressLayout;      // default: MostlyDisabled
 }
 
 
@@ -1551,9 +1554,6 @@ interface SettingsDiscPropsOldNames {
 
 // Try move to DiscPropsSource.
 interface TopicInterfaceSettings {
-  // Deprecated:
-  progressLayout?: ProgressLayout;      // default: Visible
-
   // Currently for embedded comments: (later, can configure in disc_props_t.)
   origPostReplyBtnTitle?: string;       // default: t.AddComment
   origPostVotes?: OrigPostVotes;

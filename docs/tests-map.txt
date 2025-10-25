@@ -1116,7 +1116,7 @@ post -
   copy address:
           - move-posts-same-page.2br.d  TyT03946HET3
           - move-posts-other-page.2br.d  TyT7038286BR3
-  move post:
+  move post TyTMOPO:
     move to different page section,
     move to differen parent, same page:
             - MovePostsAppSpec.scala  TyTMOPO

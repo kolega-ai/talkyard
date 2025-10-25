@@ -51,6 +51,8 @@ describe("page-type-idea-statuses-comments.2br.d  TyTPATYIDEA", () => {
 
   it("Import a site", async () => {
     const site: SiteData = make.forumOwnedByOwen('pgstbc', { title: "Page Type Idea Test" });
+    // We add a _Progress_Note below.
+    site.settings.progressLayout = c.ProgressLayoutEnabled;
     site.members.push(maria);
     site.members.push(michael);
     site.members.push(corax);
@@ -111,6 +113,7 @@ describe("page-type-idea-statuses-comments.2br.d  TyTPATYIDEA", () => {
   });
 
   it("Maria posts a progress reply", async () => {
+    // _Progress_Note:
     await mariasBrowser.complex.addProgressReply(bottomCommentOneText);  // #post-5
   });
 
@@ -135,6 +138,7 @@ describe("page-type-idea-statuses-comments.2br.d  TyTPATYIDEA", () => {
   });
 
   it("Posts another progress reply", async () => {
+    // _Progress_Note:
     await mariasBrowser.complex.addProgressReply(bottomCommentTwoText);  // #post-10
   });
 
