@@ -3052,6 +3052,11 @@ trait PostsDao {
 
 
   RENAME // all ... IfAuth to IfAuZ (if authorized)
+  /**
+   * @param moveWhere BUG: If someone has started writing a reply, and saved a draft of
+   * a reply to `whichPost` or any of its descendants, and if `moveWhere` is to another page,
+   * then there's a db constraints error. [mv_post_w_draft_reply]
+   */
   def movePostIfAuth(whichPost: PagePostId, moveWhere: MovePostWhere,
         reqrAndMover: ReqrAndTgt): (Post, JsObject) = {
 

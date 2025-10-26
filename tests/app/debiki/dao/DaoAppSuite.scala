@@ -17,7 +17,6 @@
 
 package debiki.dao
 
-import scala.collection.Seq
 import com.debiki.core._
 import com.debiki.core.Prelude._
 import debiki.{Globals, TextAndHtml, TextAndHtmlMaker, TitleSourceAndHtml}
@@ -30,7 +29,17 @@ import java.io.File
 import play.api.inject.DefaultApplicationLifecycle
 import play.api._
 import talkyard.server.dao.StaleStuff
+import talkyard.server.authz.ReqrAndTgt
 
+
+/** Err codes, so typos / changing the err codes, won't make tests always pass. */
+object ErrCodes {
+  val TyE_MayNotReply_CantSeePage = "TyEM0RE0SEE_"
+  val TyE_MayNotEdit_CantSeePage = "TyEM0ED0SEE_"
+
+  val TyE_MayNotMovePost_MayNotEdit = "TyEMOPO_M0EDIT_"
+  val TyE_MayNotMovePost_MayNotReply = "TyEMOPO_M0RE_"
+}
 
 
 object DaoAppSuite {
@@ -311,7 +320,8 @@ class DaoAppSuite(
 
   def createCategory(slug: String, forumPageId: PageId, parentCategoryId: CategoryId,
         authorId: UserId, browserIdData: BrowserIdData,
-        dao: SiteDao, anyCategoryId: Option[CategoryId] = None): CreateCategoryResult = {
+        dao: SiteDao, anyCategoryId: Option[CategoryId] = None,
+        permissions: Seq[PermsOnPages] = null, staffOnly: Bo = false): CreateCategoryResult = {
 
     val newCatId = dao.readTx(_.nextCategoryId())
 
@@ -338,11 +348,16 @@ class DaoAppSuite(
           includeInSummaries = IncludeInSummaries.Default,
           description = s"Cat $slug Description")
 
-    val permissions = Vector(
-          ForumDao.makeEveryonesDefaultCategoryPerms(newCatId),
-          ForumDao.makeStaffCategoryPerms(newCatId))
+    val permissions2 =
+          if (permissions ne null)
+                permissions
+          else if (staffOnly) Vector(
+                ForumDao.makeStaffCategoryPerms(newCatId))
+          else Vector(
+                ForumDao.makeEveryonesDefaultCategoryPerms(newCatId),
+                ForumDao.makeStaffCategoryPerms(newCatId))
 
-    dao.createCategory(categoryData, permissions, Who(SystemUserId, browserIdData))
+    dao.createCategory(categoryData, permissions2, Who(SystemUserId, browserIdData))
   }
 
 
@@ -395,6 +410,13 @@ class DaoAppSuite(
     dao.insertReplySkipAuZ(textAndHtml, pageId,
       replyToPostNrs = Set(parentNr getOrElse PageParts.BodyNr), PostType.Normal, deleteDraftNr = None,
       Who(TrueId(memberId), browserIdData), dummySpamRelReqStuff).post
+  }
+
+
+  def vote(reqrAndVoter: ReqrAndTgt, pageId: PageId, postNr: PostNr, voteType: PostVoteType,
+          )(dao: SiteDao): U = {
+    dao.addVoteIfAuZ(pageId = pageId, postNr = postNr, voteType, reqrAndVoter,
+          voterIp = None, postNrsRead = Set.empty)
   }
 
 

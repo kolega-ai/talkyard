@@ -1119,11 +1119,23 @@ post -
   move post:
     move to different page section,
     move to differen parent, same page:
-          - move-posts-same-page.2br.d  TyT03946HET3
+            - MovePostsAppSpec.scala  TyTMOPO
+            - move-posts-same-page.2br.d  TyT03946HET3
     move to differen parent, other page:
-          - move-posts-other-page.2browsers.test.ts  TyT7038286BR3
-          - move-posts-newer-page-reply.2br.d  TyTMOPONEPG
-          - move-posts-pin-delete.2br.d  TyTMOPOPINDEL
+            - MovePostsAppSpec.scala  TyTMOPO
+            - move-posts-other-page.2browsers.test.ts  TyT7038286BR3
+            - move-posts-newer-page-reply.2br.d  TyTMOPONEPG
+            - move-posts-pin-delete.2br.d  TyTMOPOPINDEL
+    move to new page:
+            - MovePostsAppSpec.scala  TyTMOPO.TyTMOPO_NEWPG
+            - TESTS_MISSING: e2e tests
+    move post with bookmarks and draft replies:
+            - TESTS_MISSING and there's a bug: [mv_post_w_draft_reply]
+    updates stats & meta:
+            - MovePostsAppSpec.scala  TyTMOPO.TyTMOPO_META
+            - TESTS_MISSING  TyTMOPO.TyTMOPO_META_LATEST   these fields:
+                  lastApprovedReplyAt, lastApprovedReplyById, authorId
+                  answeredAt, answerPostId, version
   view edit history:
   votes -
     cast all types:      votes-and-best-first.test.ts

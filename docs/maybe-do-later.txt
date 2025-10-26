@@ -75,6 +75,20 @@ The new owner can, but the original author can't, edit it and delete it etc.
 post A is-answer-to post Q (could be many answers), multireplies, here.
 
 [drafts_as_posts] Move drafts from drafts3 to posts_t?
+Also see the [mv_post_w_draft_reply] bug.
+
+[mv_post_w_draft_reply] bug:
+If moving a post for which sbd has started writing a reply and saved a draft,
+then, a db constaint: drafts_pageid_postnr_r_posts  (right?) results in an
+error, because it refers to the post-being-replied-to by page id + post nr,
+instead of post id.
+Solution?: Use only post id in foreign key, but do remember page id + post nr,
+in case the post-being-replied-to gets moved elsewhere — so there's still
+a way for the draft author to see what page & location (post nr)
+han *tried* to reply to, before the post got moved (if it got moved to a
+page han cannot access. But if han *can* access it, then of course can just continue
+writing the draft on the new page (i.e. the page the comment got moved to)).
+
 
 [flags_as_posts] Move flags from  post_actions3 to  posts_t, and use a future
 table  post_rels_t  to link to flagged posts or user accounts.

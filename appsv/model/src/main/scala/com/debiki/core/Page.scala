@@ -541,6 +541,9 @@ case class PageMeta( // ?RENAME to Page? And rename Page to PageAndPosts?  [exp]
     */
   def copyWithUpdatedStats(page: Page, updateBumpedAt: Bo = true,
           newBumpedAt: Opt[When] = None): PageMeta = {
+    // Tests:
+    //  - MovePostsAppSpec.scala  TyTMOPO_META
+
     require(newBumpedAt.isEmpty || updateBumpedAt, "Ty5N602RKJS")
 
     val body = page.parts.body
@@ -553,6 +556,7 @@ case class PageMeta( // ?RENAME to Page? And rename Page to PageAndPosts?  [exp]
             bumpedAt, page.parts.lastVisibleReply.map(_.createdAt)),
       lastApprovedReplyAt = page.parts.lastVisibleReply.map(_.createdAt),
       lastApprovedReplyById = page.parts.lastVisibleReply.map(_.createdById),
+      // authorId — upd later, if post author/owner can be changed.
       frequentPosterIds = page.parts.frequentPosterIds,
       numLikes = page.parts.numLikes,
       numWrongs = page.parts.numWrongs,
