@@ -788,45 +788,6 @@ trait PostsSiteDaoMixin extends SiteTransaction {
   }
 
 
-
-  def loadPostsToReview(): immutable.Seq[Post] = {
-    val flaggedPosts = loadPostsToReviewImpl("""
-      po.deleted_status = 0 and
-      po.num_pending_flags > 0
-      """)
-    val unapprovedPosts = loadPostsToReviewImpl("""
-      po.deleted_status = 0 and
-      po.num_pending_flags = 0 and
-      (po.approved_rev_nr is null or po.approved_rev_nr < po.curr_rev_nr)
-      """)
-    val postsWithSuggestions = loadPostsToReviewImpl("""
-      po.deleted_status = 0 and
-      po.num_pending_flags = 0 and
-      po.approved_rev_nr = curr_rev_nr and
-      po.num_edit_suggestions > 0
-      """)
-    (flaggedPosts ++ unapprovedPosts ++ postsWithSuggestions).to(immutable.Seq)
-  }
-
-
-  private def loadPostsToReviewImpl(whereTests: String): ArrayBuffer[Post] = {
-    val query = s""" -- loadPostsToReviewImpl
-          $select__posts_po__leftJoin__patPostRels_pa
-          where po.site_id = ? and $whereTests
-          $groupBy__siteId_postId
-          """
-    val values = List(siteId.asAnyRef)
-    var results = ArrayBuffer[Post]()
-    runQuery(query, values, rs => {
-      while (rs.next()) {
-        val post = readPost(rs)
-        results += post
-      }
-    })
-    results
-  }
-
-
   override def nextPostId(): PostId = {
     val query = """ -- nextPostId
       select max(unique_post_id) max_id from posts3 where site_id = ?

@@ -3488,22 +3488,6 @@ trait PostsDao {
   }
 
 
-  private def _loadThingsToReview_unused(): ThingsToReview = {  // DELETE
-    readOnlyTransaction { tx =>
-      val posts = tx.loadPostsToReview()
-      val pageMetas = tx.loadPageMetas(posts.map(_.pageId))
-      val flags = tx.loadFlagsFor(posts.map(_.pagePostNr))
-      val userIds = mutable.HashSet[UserId]()
-      userIds ++= posts.map(_.createdById)
-      userIds ++= posts.map(_.currentRevisionById)
-      // Not the true id — they're supposed to be anonymous.
-      userIds ++= flags.map(_.flaggerId.pubId)
-      val users = tx.loadParticipants(userIds.toSeq)
-      ThingsToReview(posts, pageMetas, users, flags)
-    }
-  }
-
-
   /** Returns all posts hidden as a result of this flag — which might be many, because
     * the flag might result in the computer believing the user is Bad, and hide all hens posts.
     */

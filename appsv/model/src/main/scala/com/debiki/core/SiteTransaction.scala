@@ -141,8 +141,6 @@ trait SiteTransaction {   RENAME // to SiteTx — already started with a type Si
 
   def loadApprovedOrigPostAndRepliesByPage(pageIds: Iterable[PageId]): Map[PageId, immutable.Seq[Post]]
 
-  def loadPostsToReview(): immutable.Seq[Post]
-
   // Later all these params can be a ListPostsQuery instead.
   // Also, these params:  includeDeleted,  includeHidden.
   //    includeChatMessages: Boolean,  onlyUnapproved: Boolean,
