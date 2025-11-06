@@ -689,8 +689,6 @@ var t_en_US: TalkyardTranslations = t = {
     About_2: " chat channel, created by ",
     ScrollUpViewComments: "Scroll up to view older comments",
     Purpose: "Purpose:",
-    edit: "edit",
-    'delete': "delete",
     MessageDeleted: "(Message deleted)",
     JoinThisChat: "Join this chat",
     PostMessage: "Post message",

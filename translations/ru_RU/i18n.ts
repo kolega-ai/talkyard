@@ -681,8 +681,6 @@ var t_ru_RU: TalkyardTranslations = t = {
     About_2: " канал чата, созданный ",
     ScrollUpViewComments: "Прокрутите вверх, чтобы просмотреть старые комментарии",
     Purpose: "Цель:",
-    edit: "ред",
-    'delete': "удалить",
     MessageDeleted: "(Сообщение удалено)",
     JoinThisChat: "Присоединяйтесь к чату",
     PostMessage: "Отправить сообщение",
