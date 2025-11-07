@@ -6451,14 +6451,6 @@ export class TyE2eTestBrowser {
       openAdvancedEditor: () => {
         this.waitAndClick('.esC_Edtr_AdvB');
       },
-
-      deleteChatMessageNr: (nr: PostNr) => {
-        const postSelector = `#post-${nr}`;
-        this.waitAndClick(`${postSelector} .s_C_M_B-Dl`);
-        this.waitAndClick('.dw-delete-post-dialog .e_YesDel');
-        this.waitUntilLoadingOverlayGone();
-        this.waitForVisible(`${postSelector}.s_C_M-Dd`);
-      },
     };
 
 

@@ -1,15 +1,12 @@
 /// <reference path="../test-types.ts"/>
 
 import * as _ from 'lodash';
-import assert = require('../utils/ty-assert');
-import server = require('../utils/server');
-import utils = require('../utils/utils');
-import { buildSite } from '../utils/site-builder';
+import assert from '../utils/ty-assert';
+import server from '../utils/server';
 import * as make from '../utils/make';
-import { TyE2eTestBrowser } from '../utils/pages-for';
-import settings = require('../utils/settings');
-import lad = require('../utils/log-and-die');
-import c = require('../test-constants');
+import { buildSite } from '../utils/site-builder';
+import { TyE2eTestBrowser } from '../utils/ty-e2e-test-browser';
+import c from '../test-constants';
 
 
 let richBrowserA;
@@ -41,7 +38,7 @@ let chatPageUrl: string;
 
 describe("admin-review-cascade-approval  TyT0SKDE24", () => {
 
-  it("import a site", () => {
+  it("import a site", async () => {
     const builder = buildSite();
     forum = builder.addTwoPagesForum({
       title: "Cascade Approvals E2E Test",
@@ -60,21 +57,21 @@ describe("admin-review-cascade-approval  TyT0SKDE24", () => {
     });
     assert.refEq(builder.getSite(), forum.siteData);
 
-    const siteData: SiteData2 = forum.siteData;
+    const siteData = forum.siteData;
     siteData.settings.requireVerifiedEmail = false;
     siteData.settings.maxPostsPendApprBefore = 9;
     siteData.settings.numFirstPostsToApprove = 1;
 
-    siteIdAddress = server.importSiteData(forum.siteData);
+    siteIdAddress = await server.importSiteData(forum.siteData);
     siteId = siteIdAddress.id;
-    server.skipRateLimits(siteId);
+    server.skipRateLimits(siteId); // 0await
     discussionPageUrl = siteIdAddress.origin + '/' + forum.topics.byMichaelCategoryA.slug;
     chatPageUrl = siteIdAddress.origin + '/' + chatPage.slug;
   });
 
-  it("initialize people", () => {
-    richBrowserA = new TyE2eTestBrowser(browserA);
-    richBrowserB = new TyE2eTestBrowser(browserB);
+  it("initialize people", async () => {
+    richBrowserA = new TyE2eTestBrowser(wdioBrowserA, 'brA');
+    richBrowserB = new TyE2eTestBrowser(wdioBrowserB, 'brB');
 
     owen = forum.members.owen;
     owensBrowser = richBrowserA;
@@ -86,93 +83,93 @@ describe("admin-review-cascade-approval  TyT0SKDE24", () => {
     strangersBrowser = richBrowserB;
   });
 
-  it("Merche goes to the chat page", () => {
-    merchesBrowser.go(chatPageUrl);
+  it("Merche goes to the chat page", async () => {
+    await merchesBrowser.go2(chatPageUrl);
   });
 
-  it("... clicks Join Chat", () => {
-    merchesBrowser.chat.joinChat();
+  it("... clicks Join Chat", async () => {
+    await merchesBrowser.chat.joinChat();
   });
 
-  it("... signs up", () => {
-    merchesBrowser.loginDialog.createPasswordAccount(merche);
+  it("... signs up", async () => {
+    await merchesBrowser.loginDialog.createPasswordAccount(merche);
   });
 
-  it("... verifies her email", function() {
-    const url = server.getLastVerifyEmailAddressLinkEmailedTo(
-      siteIdAddress.id, merche.emailAddress, merchesBrowser);
-    merchesBrowser.go(url);
-    merchesBrowser.hasVerifiedSignupEmailPage.clickContinue();
+  it("... verifies her email", async () => {
+    const url = await server.waitAndGetLastVerifyEmailAddressLinkEmailedTo(
+      siteIdAddress.id, merche.emailAddress);
+    await merchesBrowser.go2(url);
+    await merchesBrowser.hasVerifiedSignupEmailPage.clickContinue();
   });
 
-  it("... clicks Jon Chat again", () => {
-    merchesBrowser.chat.joinChat();
+  it("... clicks Jon Chat again", async () => {
+    await merchesBrowser.chat.joinChat();
   });
 
-  it("... posts a chat message", () => {
-    merchesBrowser.chat.addChatMessage(chatMessageOneStays);
-    merchesBrowser.chat.waitForNumMessages(1);
+  it("... posts a chat message", async () => {
+    await merchesBrowser.chat.addChatMessage(chatMessageOneStays);
+    await merchesBrowser.chat.waitForNumMessages(1);
   });
 
-  it("... some time elapses, so next message won't get merged", () => {
-    server.playTimeMinutes(30);
+  it("... some time elapses, so next message won't get merged", async () => {
+    await server.playTimeMinutes(30);
   });
 
-  it("... she posts another message", () => {
-    merchesBrowser.chat.addChatMessage(chatMessageTwoDeleted);
-    merchesBrowser.chat.waitForNumMessages(2);
+  it("... she posts another message", async () => {
+    await merchesBrowser.chat.addChatMessage(chatMessageTwoDeleted);
+    await merchesBrowser.chat.waitForNumMessages(2);
   });
 
-  it("... but deletes this one  TyT052SKDGJ37", () => {
-    // Ooops!  .s_C_M_B-Dl  gone.
-    merchesBrowser.chat.deleteChatMessageNr(c.FirstReplyNr + 1);
+  it("... but deletes this one  TyT052SKDGJ37", async () => {
+    await merchesBrowser.chat.deleteChatMessageNr(c.FirstReplyNr + 1);
   });
 
-  it("Merche goes to the discussion page", () => {
-    merchesBrowser.go(discussionPageUrl);
+  it("Merche goes to the discussion page", async () => {
+    await merchesBrowser.go2(discussionPageUrl);
   });
 
-  it("... posts a reply", () => {
-    merchesBrowser.complex.replyToOrigPost(origPostReplyOneStays);
+  it("... posts a reply", async () => {
+    await merchesBrowser.complex.replyToOrigPost(origPostReplyOneStays);
   });
 
-  it("... and another reply", () => {
-    merchesBrowser.complex.replyToOrigPost(origPostReplyTwoDeleted);
+  it("... and another reply", async () => {
+    await merchesBrowser.complex.replyToOrigPost(origPostReplyTwoDeleted);
   });
 
-  it("... but deletes this one", () => {
-    merchesBrowser.topic.deletePost(c.FirstReplyNr + 1);
+  it("... but deletes this one", async () => {
+    await merchesBrowser.topic.deletePost(c.FirstReplyNr + 1);
   });
 
-  it("... and one last reply, which Owen will approve", () => {
-    merchesBrowser.complex.replyToOrigPost(aReplyToApprove);
+  it("... and one last reply, which Owen will approve", async () => {
+    await merchesBrowser.complex.replyToOrigPost(aReplyToApprove);
   });
 
-  it("Merche leaves, Meilani arrives and signs up", () => {
-    merchesBrowser.topbar.clickLogout();
-    meilanisBrowser.complex.signUpAsMemberViaTopbar(meilani);
+  it("Merche leaves, Meilani arrives and signs up", async () => {
+    await merchesBrowser.topbar.clickLogout();
+    await meilanisBrowser.complex.signUpAsMemberViaTopbar(meilani);
   });
 
-  it("... verifies her email address", () => {
-    const url = server.getLastVerifyEmailAddressLinkEmailedTo(
-      siteIdAddress.id, meilani.emailAddress, meilanisBrowser);
-    meilanisBrowser.go(url);
-    meilanisBrowser.hasVerifiedSignupEmailPage.clickContinue();
+  it("... verifies her email address", async () => {
+    const url = await server.waitAndGetLastVerifyEmailAddressLinkEmailedTo(
+      siteIdAddress.id, meilani.emailAddress);
+    await meilanisBrowser.go2(url);
+    await meilanisBrowser.hasVerifiedSignupEmailPage.clickContinue();
   });
 
-  it("Meilani posts two replies", () => {
-    meilanisBrowser.complex.replyToOrigPost(meilanianisReplyOne);
-    meilanisBrowser.complex.replyToOrigPost(meilanianisReplyTwo);
-    meilanisBrowser.topic.assertNumRepliesVisible(2 + 2);  // Merche's + Meilani's
+  it("Meilani posts two replies", async () => {
+    await meilanisBrowser.complex.replyToOrigPost(meilanianisReplyOne);
+    await meilanisBrowser.complex.replyToOrigPost(meilanianisReplyTwo);
+    await meilanisBrowser.topic.assertNumRepliesVisible(2 + 2);  // Merche's + Meilani's
   });
 
-  it("... then leaves", () => {
-    meilanisBrowser.topbar.clickLogout();
+  it("... then leaves", async () => {
+    await meilanisBrowser.topbar.clickLogout();
   });
 
-  it("The replies appear as unapproved", () => {
-    const counts = strangersBrowser.topic.countReplies();
-    assert.deepEq(counts, { numNormal: 0, numPreviews: 0, numUnapproved: 4, numDeleted: 0 });
+  it("The replies appear as unapproved", async () => {
+    const counts = await strangersBrowser.topic.countReplies();
+    assert.deepEq(counts, {
+          numNormal: 0, numDrafts: 0, numPreviews: 0, numUnapproved: 4, numDeleted: 0 });
   });
 
 
@@ -181,34 +178,35 @@ describe("admin-review-cascade-approval  TyT0SKDE24", () => {
   //   and another topic but deletes that one.
 
 
-  it("Owen logs in to the admin area, the review tab", () => {
-    owensBrowser.adminArea.review.goHere(siteIdAddress.origin, { loginAs: owen });
+  it("Owen logs in to the admin area, the review tab", async () => {
+    await owensBrowser.adminArea.review.goHere(siteIdAddress.origin, { loginAs: owen });
   });
 
-  it("There are 2 + 3 + 2 posts waiting for review", () => {
-    assert.eq(owensBrowser.adminArea.review.countThingsToReview(), 7);
+  it("There are 2 + 3 + 2 posts waiting for review", async () => {
+    assert.eq(await owensBrowser.adminArea.review.countThingsToReview(), 7);
   });
 
-  it("Owen approves Merche's most recent post", () => {
-    owensBrowser.adminArea.review.approvePostForTaskIndex(3);
+  it("Owen approves Merche's most recent post", async () => {
+    await owensBrowser.adminArea.review.approvePostForTaskIndex(3);
   });
 
-  it("... the server carries out the review task", () => {
-    owensBrowser.adminArea.review.playTimePastUndo();
-    owensBrowser.adminArea.review.waitForServerToCarryOutDecisions();
+  it("... the server carries out the review task", async () => {
+    await owensBrowser.adminArea.review.playTimePastUndo();
+    await owensBrowser.adminArea.review.waitForServerToCarryOutDecisions();
   });
 
-  it("... this cascade-approves Merche's other posts", () => {
+  it("... this cascade-approves Merche's other posts", async () => {
     let counts: NumReplies;
-    strangersBrowser.refreshUntil(() => {
-      counts = strangersBrowser.topic.countReplies();
+    await strangersBrowser.refreshUntil(async () => {
+      counts = await strangersBrowser.topic.countReplies();
       return counts.numNormal === 2;
     });
-    assert.deepEq(counts, { numNormal: 2, numPreviews: 0, numUnapproved: 2, numDeleted: 0 });
+    assert.deepEq(counts, {
+          numNormal: 2, numDrafts: 0, numPreviews: 0, numUnapproved: 2, numDeleted: 0 });
     // Apparently can take a short while before React has shown the .dw-p (post body),
     // this error happened:
     //     "Text match failure, selector:  #post-2 .dw-p-bd,  No elems match the selector."
-    strangersBrowser.topic.waitForPostNrVisible(c.FirstReplyNr);
+    await strangersBrowser.topic.waitForPostNrVisible(c.FirstReplyNr);
   });
 
   // Without running into any errors because some of those posts have:
@@ -217,35 +215,36 @@ describe("admin-review-cascade-approval  TyT0SKDE24", () => {
   //  - Been deleted already, by Merche.
   //
 
-  it("... Merche's posts, not Meilaniani's", () => {
-    strangersBrowser.topic.assertPostTextMatches(c.FirstReplyNr, origPostReplyOneStays);
-    strangersBrowser.topic.assertPostTextMatches(c.FirstReplyNr + 2, aReplyToApprove);
+  it("... Merche's posts, not Meilaniani's", async () => {
+    await strangersBrowser.topic.assertPostTextMatches(c.FirstReplyNr, origPostReplyOneStays);
+    await strangersBrowser.topic.assertPostTextMatches(c.FirstReplyNr + 2, aReplyToApprove);
   });
 
 
-  it("Owen approves Meilaniani's most recent post", () => {
-    owensBrowser.adminArea.review.approvePostForMostRecentTask();
+  it("Owen approves Meilaniani's most recent post", async () => {
+    await owensBrowser.adminArea.review.approvePostForMostRecentTask();
   });
 
-  it("... the server obeys", () => {
-    owensBrowser.adminArea.review.playTimePastUndo();
-    owensBrowser.adminArea.review.waitForServerToCarryOutDecisions();
+  it("... the server obeys", async () => {
+    await owensBrowser.adminArea.review.playTimePastUndo();
+    await owensBrowser.adminArea.review.waitForServerToCarryOutDecisions();
   });
 
-  it("... namely cascade-approves Meilani's posts too", () => {
+  it("... namely cascade-approves Meilani's posts too", async () => {
     let counts: NumReplies;
-    strangersBrowser.refreshUntil(() => {
-      counts = strangersBrowser.topic.countReplies();
+    await strangersBrowser.refreshUntil(async () => {
+      counts = await strangersBrowser.topic.countReplies();
       return counts.numNormal === 4;
     });
-    assert.deepEq(counts, { numNormal: 4, numPreviews: 0, numUnapproved: 0, numDeleted: 0 });
+    assert.deepEq(counts, {
+            numNormal: 4, numDrafts: 0, numPreviews: 0, numUnapproved: 0, numDeleted: 0 });
   });
 
-  it("... with the correct text contents", () => {
-    strangersBrowser.topic.assertPostTextMatches(c.FirstReplyNr, origPostReplyOneStays);
-    strangersBrowser.topic.assertPostTextMatches(c.FirstReplyNr + 2, aReplyToApprove);
-    strangersBrowser.topic.assertPostTextMatches(c.FirstReplyNr + 3, meilanianisReplyOne);
-    strangersBrowser.topic.assertPostTextMatches(c.FirstReplyNr + 4, meilanianisReplyTwo);
+  it("... with the correct text contents", async () => {
+    await strangersBrowser.topic.assertPostTextMatches(c.FirstReplyNr, origPostReplyOneStays);
+    await strangersBrowser.topic.assertPostTextMatches(c.FirstReplyNr + 2, aReplyToApprove);
+    await strangersBrowser.topic.assertPostTextMatches(c.FirstReplyNr + 3, meilanianisReplyOne);
+    await strangersBrowser.topic.assertPostTextMatches(c.FirstReplyNr + 4, meilanianisReplyTwo);
   });
 
 });

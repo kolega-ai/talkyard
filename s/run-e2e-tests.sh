@@ -395,7 +395,7 @@ function runAllE2eTests {
   $r s/wdio --only admin-user-suspend.2browsers $args
   $r s/wdio --only admin-review-invalidate-for-reply.2br.mtime $args
   $r s/wdio --only admin-review-invalidate-page-deld.2br.mtime $args
-  $r s/wdio --only admin-review-cascade-approval.2br.mtime $args
+  $r s/wdio-7 --only admin-review-cascade-approval.2br.f.mtime --cd -i $args
   $r s/wdio --only modn-approve-before.2br.mtime $args
   $r s/wdio --only modn-review-after.2br.mtime $args   # + liked, marked as solution
   $r s/wdio --only modn-appr-bef-comb-w-revw-aftr.2br.mtime $args
