@@ -1,17 +1,21 @@
-# Scala supports Java 8, 11 and 17. Ty uses Debian 11 and Java 11, currently.
+
 # Cannot upgrade to Java 17, because Nashorn has been removed.
+# This is Ubuntu though. Could create a Debian slim JRE, see: [slim_jre].
+FROM  eclipse-temurin:11.0.29_7-jdk-noble
 
-# This is Ubuntu though. Could create a Debian 11 slim JRE, see: [slim_jre].
-FROM  eclipse-temurin:11.0.18_10-jdk-focal
 
-# Don't:
-#     eclipse-temurin:11.0.17_8-jdk-jammy
-#
-# — then there can be a misleading "insufficient memory" error, because Ubuntu 22
-# (JDK-Jammy) ships with glibc 2.35, which uses clone3 (>= 2.34 does),
+# We'll create our own user, 'owner', with the same id as the host OS user.
+# But user 'ubuntu', id 1000, often collides with 'owner' (same id),
+# so delete it (it's not used for anything, just for convenience, right).
+RUN touch /var/mail/ubuntu && chown ubuntu /var/mail/ubuntu && userdel -r ubuntu
+
+
+# If using an old version of Ubuntu or Debian (Ubuntu Focal or Debian 10),
+# there can be a misleading "insufficient memory" error, because newer Ubuntu versions >= 22
+# (JDK-Jammy) ships with glibc >= 2.35, which uses clone3 (>= 2.34 does),
 # but Docker doesn't work with clone3, until PR 42681 (fix for 42680). Which
-# is available starting with Docker v20.10.10, but I'd rather not force people
-# to upgrade their Docker installation. (Debian 11 should be ok too, doesn't use clone3.)
+# is available starting with Docker v20.10.10,  but maybe not incl by default in
+# old OS versions.
 # See:
 #  A misleading "insufficient memory for the Java Runtime [...]" error:
 #  https://stackoverflow.com/questions/72841549/container-fails-to-start-insufficient-memory-for-the-java-runtime-environment-t/73970043#73970043
