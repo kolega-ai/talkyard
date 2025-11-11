@@ -1436,7 +1436,7 @@ class EdSecurity(globals: Globals) {
     import MayMaybe._
     mayMaybe match {
       case Yes => // fine
-      case NoNotFound(debugCode) => throwIndistinguishableNotFound(debugCode)
+      case NoNotFound(code2) => throwIndistinguishableNotFound(s"$errorCode-$code2")
       case NoMayNot(code2, reason) => throwForbidden(s"$errorCode-$code2", reason)
     }
   }

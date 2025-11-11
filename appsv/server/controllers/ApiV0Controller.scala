@@ -21,13 +21,13 @@ import com.debiki.core._
 import com.debiki.core.Prelude._
 import debiki.EdHttp._
 import debiki.RateLimits
+import debiki.AtomFeedXml.{FeedPath, EmbeddedCommentsFeedPath}
 import talkyard.server.{TyContext, TyController}
 import talkyard.server.http._
 import javax.inject.Inject
 import play.api.libs.json._
 import play.api.mvc._
 import Utils.OkXml
-
 
 // How test API?
 //  https://medium.com/javascript-scene/why-i-use-tape-instead-of-mocha-so-should-you-6aa105d8eaf4
@@ -55,11 +55,10 @@ class ApiV0Controller @Inject()(cc: ControllerComponents, edContext: TyContext,
   private val logger = talkyard.server.TyLogger("ApiV0Controller")
 
   def getFromApi(apiEndpoint: String): Action[Unit] =
+        // There's [get_api_rate_limits] checks elsewhere.
         GetActionRateLimited(RateLimits.NoRateLimits) { request: GetRequest =>
 
     import request.{queryString, dao}
-
-    val EmbeddedCommentsFeedPath = "embedded-comments-feed"
 
     // DEPRECATED  don't do match-case, instead, use different controllers,
     // and endpoint handlers prefixed with  apiv0_ ...
@@ -109,7 +108,7 @@ class ApiV0Controller @Inject()(cc: ControllerComponents, edContext: TyContext,
       // as StackOverflow style "comments" below a Q&A answer post.
       //
       // Whilst this (/-/v0/feed) is about the Talkyard site only and links to it:
-      case "feed" | EmbeddedCommentsFeedPath =>
+      case FeedPath | EmbeddedCommentsFeedPath =>
         val onlyEmbeddedComments = apiEndpoint == EmbeddedCommentsFeedPath
         /*
         https://server.address/-/v0/recent-posts.rss  — No! Explosion of endpoints. Instead:

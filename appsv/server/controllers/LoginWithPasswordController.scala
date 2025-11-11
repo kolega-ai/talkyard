@@ -274,7 +274,8 @@ class LoginWithPasswordController @Inject()(cc: ControllerComponents, edContext:
           // so no email addresses are leaked.
           LoginWithPasswordController.sendYouAlreadyHaveAnAccountWithThatAddressEmail(
                 dao, emailAddress, siteHostname = request.host, siteId = request.siteId)
-          (None, Nil)
+          TESTS_MISSING // Was a bug:  (None, Nil)  — match error.  TyTAU_DUPLUN
+          (None, None, Nil)
       }
 
       val (weakSessionId: St, xsrfToken: St) =

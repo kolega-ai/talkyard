@@ -247,7 +247,7 @@ case class AuditLogEntry(
     requireIf(didWhat == T.NewPage, pageId.isDefined && uniquePostId.isDefined, "EdE5PFK2")
     requireIf(didWhat == T.DeletePage || didWhat == T.UndeletePage,
                 pageId.isDefined && uniquePostId.isEmpty, "EdE7ZXCY4")
-    // COULD check uploaded file hash-path-suffix regex, see UploadsDao in debiki-server.
+    // COULD check uploaded file hash-path-suffix regex, see talkyard.server.uploads.UploadsDao.
     require(!uploadHashPathSuffix.exists(_.trim.isEmpty), "DwE0PMF2")
     require(!uploadFileName.exists(_.trim.isEmpty), "DwE7UPM1")
     require(!sizeBytes.exists(_ < 0), "DwE7UMF4")

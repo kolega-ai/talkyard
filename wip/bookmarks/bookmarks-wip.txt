@@ -38,6 +38,9 @@ TODO:
 
   - Write e2e tests
 
+  - Moving a bookmarked posts [mv_bookmarked_post], or tree w bookmarked post,
+    moves any bookmarks too?
+    But what if the bookmarker can't see the page in its new location (e.g. priv cat)?
 
 
 Skip?:

@@ -807,7 +807,7 @@ export function findUrlFragmentAction(hashFragment?: string): FragAction | undef
     const store: Store = ReactStore.allData();
     const result = !store.currentPage ? undefined : {
       type: FragActionType.ScrollToLatestPost,
-      postNr: page_mostRecentPostNr(store.currentPage),
+      postNr: page_mostRecentReplyNr(store.currentPage) || BodyNr,
     };
     return result;
   }

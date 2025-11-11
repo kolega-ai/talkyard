@@ -33,6 +33,9 @@ import debiki.dao.PageStuff
   */
 object AtomFeedXml {   // RENAME file, and class? to AtomFeedBuilder?
 
+  val FeedPath = "feed"
+  val EmbeddedCommentsFeedPath = "embedded-comments-feed"
+
   /**
    * See http://www.atomenabled.org/developers/syndication/.
    * Include in HTML e.g. like so:
@@ -53,6 +56,9 @@ object AtomFeedXml {   // RENAME file, and class? to AtomFeedBuilder?
 
     // Based on the Atom XML shown here:
     //   http://exploring.liftweb.net/master/index-15.html#toc-Section-15.7
+
+    // If editing, might need to update an empty-Atom-doc e2e test constant,
+    // see: [Atom_feed_Scala_code].
 
     if (!hostUrl.startsWith("http"))
       warnDbgDie("Bad host URL: "+ safed(hostUrl))
@@ -135,8 +141,8 @@ object AtomFeedXml {   // RENAME file, and class? to AtomFeedBuilder?
         authors. An entry must [sometimes] contain at least one author
         element [...] More info here:
           http://www.atomenabled.org/developers/syndication/
-                                                #recommendedEntryElements  */}
-        {/*<author><name>{post}</name></author>*/}{
+                                                #recommendedEntryElements  */}{
+        /*<author><name>{post}</name></author>*/}{
         /* The time of the initial creation or first availability
         of the entry.  -- but that shouldn't be the ctime, the page
         shouldn't be published at creation.
@@ -155,7 +161,8 @@ object AtomFeedXml {   // RENAME file, and class? to AtomFeedBuilder?
       Some(entry)
     }
 
-    val feedUrl = hostUrl + routes.ApiV0Controller.getFromApi("feed")
+    val feedUrl = hostUrl + routes.ApiV0Controller.getFromApi(
+          isForEmbeddedComments ? EmbeddedCommentsFeedPath | FeedPath)
     val feedName = stripSchemeSlashSlash(hostUrl)
     val feedUpdatedAt = posts.headOption.map(_.createdAt).getOrElse(new ju.Date)
 

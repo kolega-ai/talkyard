@@ -22,7 +22,7 @@ import com.debiki.core._
 import com.debiki.core.Prelude._
 import debiki._
 import debiki.RateLimits.NoRateLimits
-import debiki.dao.{LoginNotFoundException, SiteDao}
+import debiki.dao.{LoginNotFound, SiteDao}
 import talkyard.server._
 import talkyard.server.security._
 import java.{util => ju}
@@ -286,7 +286,7 @@ class PlainApiActions(
                     request, corsInfo, site, siteDao, siteSettings, block)
           }
         }
-        catch HttpResults(request, globals).exceptionToSuccessResultHandler
+        catch HttpResults(request, globals, Some(site)).exceptionToSuccessResultHandler
 
       // ----- Add CORS headers?
 
@@ -299,7 +299,7 @@ class PlainApiActions(
       else {
         // _Catch async errors, so there's a result to add CORS headers to.
         futureResult = futureResult.recover(
-              HttpResults(request, globals).exeptionToResultHandler,
+              HttpResults(request, globals, Some(site)).exeptionToResultHandler,
               )(executionContext)
         futureResult.map(_.withHeaders(corsHeaders.toSeq: _*))(executionContext)
       }
@@ -506,35 +506,31 @@ class PlainApiActions(
             (None, Nil)
         }
 
-      // Parts of `block` might be executed asynchronously. However any LoginNotFoundException
-      // should happen before the async parts, because access control should be done
-      // before any async computations are started. So I don't try to recover
+      // Parts of `block` might be executed asynchronously. However any LoginNotFound problem
+      // happens before the async parts, because access control should be done
+      // before any async computations are started. So we don't try to `recover()`
       // any AsyncResult(future-result-that-might-be-a-failure) here.
-      val resultOldCookies: Future[Result] =
-        try {
-          dao.perhapsBlockRequest(request, mendedSidStatus, anyBrowserId)
-          val anyUserMaybeSuspended =
-                dao.getUserBySessionId(mendedSidStatus) getOrIfBad { ex =>
-                  throw ex
-                }
-
-          runBlockIfAuthOk(request, site, dao, anyUserMaybeSuspended,
-                anyTySession, mendedSidStatus, xsrfOk, anyBrowserId, block)
-        }
-        catch {
-          // CLEAN_UP have getUserBySessionId() return an error instead of throwing
-          case _: LoginNotFoundException =>
+      val resultOldCookies: Future[Result] = {
+        dao.perhapsBlockRequest(request, mendedSidStatus, anyBrowserId)
+        val anyUserMaybeSuspended = {
+          dao.getUserBySessionId(mendedSidStatus, errCode = "TyESESUSR1") getOrIfBad { _ =>
             // This might happen if I manually deleted stuff from the
             // database during development, or if the server has fallbacked
             // to a standby database.
             // (Does it make sense to delete any related session from sessions_t?)
-            throw ResultException(InternalErrorResult2(i"""
-              |Internal error, please try again. For example, reload the page. [DwE034ZQ3]
-              |
-              |Details: A certain login id has become invalid. I just gave you a new id,
-              |but you will probably need to login again.""")
-              .discardingCookies(DiscardingSessionCookies: _*))
+            throw ResultException(
+                  InternalErrorResult2(i"""
+                    |Internal error, please try again. For example, reload the page. [TyESESUSR2]
+                    |
+                    |Details: A certain login id has become invalid. I just gave you a new id,
+                    |but you will probably need to log in again.""")
+                  .discardingCookies(DiscardingSessionCookies: _*))
+          }
         }
+
+        runBlockIfAuthOk(request, site, dao, anyUserMaybeSuspended,
+              anyTySession, mendedSidStatus, xsrfOk, anyBrowserId, block)
+      }
 
       val resultOkSid =
         if (newCookies.isEmpty && newBrowserIdCookie.isEmpty && !deleteAllSidCookies
@@ -929,29 +925,14 @@ class PlainApiActions(
       var result = try {
 
         // Invoke the request handler, do the actually interesting thing.
+        //
         val res = block(apiRequest)
 
         devDieIf(canUseAlias && !apiRequest.aliasRead, "TyEALIAS0READ", "Forgot to use alias")
         devDieIf(!canUseAlias && apiRequest.aliasRead, "TyEALIASREAD2", "Tried to use alias")
         res
       }
-      catch {
-        // case ProblemException ?  NEXT [ADMERRLOG] + tracer tag?
-        case ex: ResultException =>
-          // This is fine, probably just a 403 Forbidden exception or 404 Not Found, whatever.
-          logger.debug(
-                s"s$siteId: API request result exception [EsE4K2J2]: $ex, $requestUriAndIp")
-          throw ex
-        case ex: play.api.libs.json.JsResultException =>
-          // A bug in Talkyard's JSON parsing, or the client sent bad JSON?
-          logger.warn(i"""s${site.id}: Bad JSON exception [TyEJSONEX]
-              |$requestUriAndIp""", ex)
-          throw ResultException(Results.BadRequest(s"Bad JSON: $ex [TyEJSONEX]"))
-        case ex: Exception =>
-          logger.error(i"""s${site.id}: API request unexpected exception [TyEUNEXPEX],
-              |$requestUriAndIp""", ex)
-          throw ex
-      }
+      catch HttpResults(request, globals, Some(site)).exceptionToSuccessResultHandler
       finally {
         timerContext.stop()
       }

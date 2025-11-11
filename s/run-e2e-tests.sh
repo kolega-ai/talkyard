@@ -17,7 +17,7 @@ if [ `id -u` -eq 0 ]; then
 fi
 
 # '0await' means it's intentionally been left out.  [forgotten_e2e_await]
-await_maybe_missing=$(egrep -n -r '[a-z]_br[A-Z][a-zA-Z0-9_]*\..*\(' tests/e2e-wdio7/specs/ | grep -v '\bawait ' | grep -v '\b0await' | grep -v '\bnew ' | grep -v '_sync\b')
+await_maybe_missing=$(egrep -n -r '[a-z]_br[A-Z][a-zA-Z0-9_]*\..*\(' tests/e2e-wdio7/specs/ | grep -v '\bawait ' | grep -v '\b0await\b' | grep -v '\bnew ' | grep -v '_sync\b')
 if [ ! -z "$await_maybe_missing" ]; then
   echo
   echo "Maybe E2E bugs — could await be missing? Check these lines:"
@@ -395,7 +395,7 @@ function runAllE2eTests {
   $r s/wdio --only admin-user-suspend.2browsers $args
   $r s/wdio --only admin-review-invalidate-for-reply.2br.mtime $args
   $r s/wdio --only admin-review-invalidate-page-deld.2br.mtime $args
-  $r s/wdio --only admin-review-cascade-approval.2br.mtime $args
+  $r s/wdio-7 --only admin-review-cascade-approval.2br.f.mtime --cd -i $args
   $r s/wdio --only modn-approve-before.2br.mtime $args
   $r s/wdio --only modn-review-after.2br.mtime $args   # + liked, marked as solution
   $r s/wdio --only modn-appr-bef-comb-w-revw-aftr.2br.mtime $args
@@ -746,6 +746,9 @@ function runAllE2eTests {
   $r s/wdio-7     --only embcom.sso.token-direct-w-logout-url.2br.ec --cd -i $args
   $r s/wdio-7     --only embcom.sso.token-in-cookie.2br.ec --cd -i $args
   $r s/wdio-7     --only embcom.sso.redir-page.2br.ec --cd -i $args
+
+  # Atom feeds
+  $r s/wdio-7     --only embcom.feeds.2br.ec --cd -i $args
 
   # Many comments iframes:
   $r s/wdio-7     --only embcom.manyframes.basic.2br --cd -i $args

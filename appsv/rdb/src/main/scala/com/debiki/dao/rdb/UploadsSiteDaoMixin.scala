@@ -89,21 +89,26 @@ trait UploadsSiteDaoMixin extends SiteTransaction {
 
 
   def insertUploadedFileReference(postId: PostId, uploadRef: UploadRef,
-        addedById: UserId): Unit = {
+        addedById: UserId /* uploadedFileName: Opt[St] */): Unit = {
+    val uploadedFileName: Opt[St] = None // fix later, see: [uploaded_file_name]
     val siteIdsUsingUploadBefore = loadSiteIdsUsingUpload(uploadRef)
 
     // COULD use `insert ... on conflict do nothing` here once have upgraded to Postgres 9.5.
     // Then remove `where not exists`
     val statement = """
       insert into upload_refs3(
-        site_id, post_id, base_url, hash_path, added_by_id, added_at)
-      select ?, ?, ?, ?, ?, now_utc()
+        site_id, post_id, base_url, hash_path, added_by_id, added_at, uploaded_file_name_c)
+      select ?, ?, ?, ?, ?, now_utc(), ?
       where not exists (
         select 1 from upload_refs3
         where site_id = ? and post_id = ? and base_url = ? and hash_path = ?)
       """
     val values = List(
       siteId.asAnyRef, postId.asAnyRef, uploadRef.baseUrl, uploadRef.hashPath, addedById.asAnyRef,
+      // Currently always missing! The [uploaded_file_name] is forgotten, once the file has
+      // been saved in  uploads3.  Maybe should save a draft, and a ref from the draft?
+      // Then, we'd have the uploaded file name in the draft.
+      uploadedFileName.map(_.take(UploadRef.MaxUploadedFileNameLen)).orNullVarchar,
       siteId.asAnyRef, postId.asAnyRef, uploadRef.baseUrl, uploadRef.hashPath)
 
     try runUpdateSingleRow(statement, values)
@@ -204,6 +209,83 @@ trait UploadsSiteDaoMixin extends SiteTransaction {
       UploadRef(row.getString("bu"), row.getString("hp"))
     })
     ids.toSet
+  }
+
+
+  // Limit. Date + uploads hash path, as offset?
+  //
+  def listUploads(): Seq[UploadInfoVb] = {
+    // Tests missing, currently disabled, see: [manage_uploads_wip].
+
+    // Could optionally group-by, to show each file just once. Then,
+    // maybe use [array_agg] to find all posts where an upload is referenced, and include
+    // in such a one-row-per-upload response, could be a "Click to show usages" button.
+    // For now, we load more info directly:
+    val limit: i32 = 500 // for now
+    val query = s"""
+           select
+              ur.*,
+              u.*,
+              po.*
+              -- Maybe want/need only these:
+              -- -- po.unique_post_id — in ur.post_id already
+              -- po.page_id,
+              -- po.post_nr,
+              -- po.created_at,
+              -- po.created_by_id,
+              -- -- po.approved_source,
+              -- po.approved_html_sanitized,
+              -- -- po.curr_rev_source_patch,
+              -- po.pinned_position,
+              -- po.deleted_status,
+              -- po.closed_status,
+              -- po.hidden_at,
+              -- po.num_pending_flags,
+              -- po.num_handled_flags,
+              -- po.num_like_votes,
+              -- po.num_wrong_votes,
+              -- po.num_times_read,
+              -- po.num_bury_votes,
+              -- po.num_unwanted_votes,
+              -- po.type
+          from  upload_refs3 ur
+            inner join
+                uploads3 u  on  ur.base_url = u.base_url  and  ur.hash_path = u. hash_path
+            left outer join
+                posts3 po  on  ur.post_id = po.unique_post_id  and  ur.site_id = po.site_id
+            left outer join
+                pages3 pg  on  ur.site_id = pg.site_id  and  po.page_id = pg.page_id
+          where ur.site_id = ?
+          order by added_at desc
+          limit $limit """
+
+    runQueryFindMany(query, List(this.siteId.asAnyRef), rs => {
+      Post
+      UploadInfoVb(
+          baseUrl = getString(rs, "base_url"),
+          hashPath = getString(rs, "hash_path"),
+          sizeBytes = getInt32(rs, "size_bytes"),
+          mimeType = getString(rs, "mime_type"),
+
+          // Don't incl. Is for whole server, not this site. Server private.
+          // numReferences = getInt32(rs, "num_references"),
+
+          uploadedFileName = getOptString(rs, "uploaded_file_name_c"),
+          width = getOptInt32(rs, "width"),
+          height = getOptInt32(rs, "height"),
+
+          postId = getOptInt32(rs, "post_id"),
+          patId = None, // geOpttInt32(rs, "size_bytes"),  — later
+
+          addedById = getInt32(rs, "added_by_id"),
+          addedAt = getWhen(rs, "added_at"),
+          // uploaded_at — that's when the file was uploaded the 1st time. For the whole server. Private.
+          // updated_at — not in use? Also for whole server. Private.
+
+          // For the whole server. Private.
+          // verified_present_at, verified_absent_at, unused_since
+          )
+    })
   }
 
 

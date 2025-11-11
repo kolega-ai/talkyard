@@ -616,7 +616,10 @@ object Authz {
           tooManyPermissions)
 
     if (mayWhat.maySee isNot true)
-      return NoNotFound(s"TyEM0ED0SEE-${mayWhat.debugCode}")
+      return NoNotFound(
+            // May not edit, because may not see the page.
+            // 'M0' = May not, 'ED' = edit, because '0' = cannot 'SEE' = see the page.
+            s"TyEM0ED0SEE_-${mayWhat.debugCode}")
 
     val (isOwnPost, ownButWrongAlias) = _isOwn(user, asAlias, postAuthor = postAuthor)
     var mayBecauseWiki = false

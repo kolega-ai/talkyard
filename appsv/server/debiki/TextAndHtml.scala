@@ -25,7 +25,7 @@ import play.api.libs.json.JsArray
 import scala.collection.{immutable, mutable}
 import scala.util.matching.Regex
 import TextAndHtmlMaker._
-import debiki.dao.UploadsDao
+import talkyard.server.uploads.UploadsDao
 import org.jsoup.Jsoup
 import org.jsoup.safety.Safelist
 

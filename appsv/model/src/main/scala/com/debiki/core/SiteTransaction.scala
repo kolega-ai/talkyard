@@ -86,6 +86,8 @@ trait SiteTransaction {   RENAME // to SiteTx — already started with a type Si
   def loadAboutCategoryPageId(categoryId: CategoryId): Option[PageId]
 
   def loadPost(uniquePostId: PostId): Option[Post]   ; RENAME; QUICK // to loadPostById
+  def loadPostById(postId: PostId): Opt[Post] = loadPost(postId)
+
   def loadThePost(uniquePostId: PostId): Post =     // RENAME; QUICK // to loadPostById
     loadPost(uniquePostId).getOrElse(throw PostNotFoundByIdException(uniquePostId))
 
@@ -138,8 +140,6 @@ trait SiteTransaction {   RENAME // to SiteTx — already started with a type Si
         : Map[PageId, immutable.Seq[Post]]
 
   def loadApprovedOrigPostAndRepliesByPage(pageIds: Iterable[PageId]): Map[PageId, immutable.Seq[Post]]
-
-  def loadPostsToReview(): immutable.Seq[Post]
 
   // Later all these params can be a ListPostsQuery instead.
   // Also, these params:  includeDeleted,  includeHidden.
@@ -436,6 +436,8 @@ trait SiteTransaction {   RENAME // to SiteTx — already started with a type Si
   def insertUploadedFileMeta(uploadRef: UploadRef, sizeBytes: Int, mimeType: String,
         dimensions: Option[(Int, Int)]): Unit
   def deleteUploadedFileMeta(uploadRef: UploadRef): Unit
+
+  def listUploads(): Seq[UploadInfoVb]
 
   /** Uploaded files are referenced via 1) URLs in posts (e.g. `<a href=...> <img src=...>`)
     * and 2) from users, if a file is someone's avatar image.

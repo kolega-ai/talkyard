@@ -534,15 +534,29 @@ case class PageMeta( // ?RENAME to Page? And rename Page to PageAndPosts?  [exp]
       closedAt = newClosedAt)
   }
 
-  def copyWithUpdatedStats(page: Page, newBumpedAt: Opt[When] = None): PageMeta = {
+  /**
+    * @param updateBumpedAt If true, bumpedAt is set to the date of the most recent comment,
+    * or, `newBumpedAt`, if specified.
+    * @param newBumpedAt
+    */
+  def copyWithUpdatedStats(page: Page, updateBumpedAt: Bo = true,
+          newBumpedAt: Opt[When] = None): PageMeta = {
+    // Tests:
+    //  - MovePostsAppSpec.scala  TyTMOPO_META
+
+    require(newBumpedAt.isEmpty || updateBumpedAt, "Ty5N602RKJS")
+
     val body = page.parts.body
     def bodyVotes(fn: Post => Int): Int = body.map(fn) getOrElse 0
 
     val newMeta = copy(
-      bumpedAt = newBumpedAt.map(_.toJavaDate) orElse When.anyJavaDateLatestOf(
+      bumpedAt =
+          if (!updateBumpedAt) this.bumpedAt
+          else newBumpedAt.map(_.toJavaDate) orElse When.anyJavaDateLatestOf(
             bumpedAt, page.parts.lastVisibleReply.map(_.createdAt)),
       lastApprovedReplyAt = page.parts.lastVisibleReply.map(_.createdAt),
       lastApprovedReplyById = page.parts.lastVisibleReply.map(_.createdById),
+      // authorId — upd later, if post author/owner can be changed.
       frequentPosterIds = page.parts.frequentPosterIds,
       numLikes = page.parts.numLikes,
       numWrongs = page.parts.numWrongs,
@@ -774,6 +788,10 @@ object PageType {
     override def canHaveReplies = false
     override def mayChangeRole = false
   }
+
+  // [ContentReview_page_type] ?
+  //
+  //case object ContentReview extends PageType(1234)
 
   case object EmbeddedComments extends PageType(5, staffOnly = false)
 
@@ -1031,8 +1049,12 @@ sealed abstract class ProgressLayout(val IntVal: Int) {
   def toInt: Int = IntVal
 }
 
+/** No one uses this like I had thought — seems sometimes people click Add Progress Note
+  * mostly by mistake, as if it was a Reply button. So, now disabled by default.
+  */
 @deprecated("This was too complicated?")
 object ProgressLayout {
+  /** The default is MostlyDisabled, from v0.2025.012 and onwards. */
   object Default extends ProgressLayout(0)
   object Enabled extends ProgressLayout(1)
   object MostlyDisabled extends ProgressLayout(2)

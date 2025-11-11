@@ -55,6 +55,9 @@ describe(`direct-messages-notfs.3br.d  TyT602RKDL42`, () => {
     site.settings.allowGuestLogin = true;
     site.settings.requireVerifiedEmail = false;
 
+    // We add a _Progress_Note below.
+    site.settings.progressLayout = c.ProgressLayoutEnabled;
+
     const owen = site.members[0];
     assert.eq(owen.username, 'owen_owner');
     owen.emailNotfPrefs = c.TestEmailNotfPrefs.ReceiveAlways;  // [6029WKHU4]
@@ -144,6 +147,7 @@ describe(`direct-messages-notfs.3br.d  TyT602RKDL42`, () => {
   });
 
   it("... and replies", async () => {
+    // _Progress_Note:
     await owen.complex.addProgressReply(owensQuestionAnswer);
     await owen.topic.waitForPostNrVisible(4);
   });

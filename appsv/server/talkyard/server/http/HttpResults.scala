@@ -28,7 +28,8 @@ import scala.concurrent.Future
 import talkyard.server.TyLogging
 
 
-case class HttpResults(request: p_Request[_], globals: Globals) extends TyLogging {
+case class HttpResults(request: p_Request[_], globals: Globals, site: Opt[SiteBrief])
+      extends TyLogging {
   import HttpResults._
 
   val exceptionToSuccessResultHandler: PartialFunction[Throwable, Future[p_Result]] = {
@@ -36,6 +37,13 @@ case class HttpResults(request: p_Request[_], globals: Globals) extends TyLoggin
   }
 
   def exeptionToResultHandler: PartialFunction[Throwable, p_Result] = {
+        // Maybe later:
+        // case ex: ProblemException  or  AdminProblemEx  or  PerSiteProblemEx  ?   =>
+        //   Rememebr the problem in a per site admin error log  [ADMERRLOG]  + tracer tag?
+        //   Then developers building integrations with Ty, can look at this per site log
+        //   and see what happened — also if the site is hosted on a multitenant server.
+        //   Return status code 422 Unprocessable Entity,
+        //     or maybe sth else depending on some ProblemException field value.
         case ex: NotFoundEx =>
           p_Results.NotFound(ex.getMessage)
         case ex: BadRequestEx =>
@@ -61,34 +69,52 @@ case class HttpResults(request: p_Request[_], globals: Globals) extends TyLoggin
             "The email address related to this request has been changed. Access denied")
         case ResultException(result) =>
           result
+        // [Scala_3] Can join these 2 case into 1:
+        //se ex: play.api.libs.json.JsResultException | debiki.JsonUtils.BadJsonException =>
         case ex: play.api.libs.json.JsResultException =>
-          p_Results.BadRequest(s"Bad JSON: $ex [TyEPARSEJSN1]")
+          _badJsonResult(ex, site)
         case ex: debiki.JsonUtils.BadJsonException =>
-          p_Results.BadRequest(s"Bad JSON: $ex [TyEPARSEJSN2]")
+          _badJsonResult(ex, site)
         case Globals.AppSecretNotChangedException =>
-          BadAppSecretError
+          _BadAppSecretError
         case Globals.StillConnectingException =>
-          imStartingError(globals)
+          _imStartingError(globals)
         case ex: Globals.DatabasePoolInitializationException =>
-          databaseGoneError(request, ex, startingUp = true, globals)
+          _databaseGoneError(request, ex, startingUp = true, globals, site)
         case ex: java.sql.SQLTransientConnectionException =>
-          databaseGoneError(request, ex, startingUp = false, globals)
+          _databaseGoneError(request, ex, startingUp = false, globals, site)
         case ex: RuntimeException =>
-          internalError(request, ex, "DwE500REX", globals)
+          _internalError(request, ex, "TyE500REX", globals, site)
         case ex: Exception =>
-          internalError(request, ex, "DwE500EXC", globals)
+          _internalError(request, ex, "TyE500EXC", globals, site)
         case ex: Error =>
-          internalError(request, ex, "DwE500ERR", globals)
+          _internalError(request, ex, "TyE500ERR", globals, site)
   }
 }
 
 
 object HttpResults extends TyLogging {
 
-  private def internalError(request: p_Request[_], throwable: Throwable,
-        errorCode: St, globals: Globals) = {
+  /** This is typically a browser/client that sends json with the wrong structure,
+    * e.g. a Talkyard site admin trying to create some integration.
+    * In some rare cases, could be a server bug though. [maybe_server_error]
+    *
+    * Maybe remember & show in an admin error log? [ADMERRLOG]  [dev_friendly]
+    * And maybe show on some frequent client errors Talkyard server admin internal page?
+    * Exception line no. and stack trace or error code (but no json, no details)?
+    */
+  private def _badJsonResult(ex: Exception, site: Opt[SiteBrief]) = {
+    val msg = s"Bad JSON: $ex [TyEBADJSN]"
+    val siteId = site.map(_.id) getOrElse "?"
+    logger.debug(s"s$siteId: $msg", ex)
+    p_Results.BadRequest(msg)
+  }
+
+  private def _internalError(request: p_Request[_], throwable: Throwable,
+        errorCode: St, globals: Globals, site: Opt[SiteBrief]) = {
     val url = request.method + " //" + request.host + request.uri
-    logger.error(s"Replying internal error to: $url [$errorCode]",
+    val siteId = site.map(_.id) getOrElse "?"
+    logger.error(s"s$siteId: Replying internal error to: $url [$errorCode]",
       throwable)
     p_Results.InternalServerError(i"""500 Internal Server Error
       |
@@ -98,7 +124,7 @@ object HttpResults extends TyLogging {
       |""")
   }
 
-  private val BadAppSecretError = {
+  private val _BadAppSecretError = {
     p_Results.InternalServerError(i"""500 Internal Server Error
       |
       |Admin: Please edit the '${Globals.AppSecretConfValName}' config value,
@@ -111,7 +137,7 @@ object HttpResults extends TyLogging {
       |""")
   }
 
-  private def imStartingError(globals: Globals) = {
+  private def _imStartingError(globals: Globals) = {
     p_Results.InternalServerError(i"""500 Internal Server Error
       |
       |The server is starting:
@@ -122,8 +148,8 @@ object HttpResults extends TyLogging {
   }
 
 
-  private def databaseGoneError(request: p_Request[_], throwable: Throwable, startingUp: Bo,
-          globals: Globals): p_Result = {
+  private def _databaseGoneError(request: p_Request[_], throwable: Throwable, startingUp: Bo,
+          globals: Globals, site: Opt[SiteBrief]): p_Result = {
     val url = request.method + " //" + request.host + request.uri
     val rootCause = getRootCause(throwable)
 
@@ -164,7 +190,9 @@ object HttpResults extends TyLogging {
             "TyEDATABCONN2", "Or did a query take too long?")
       }
 
-    logger.error(s"Replying database-not-reachable error to: $url [$errorCode]", throwable)
+    val siteId = site.map(_.id) getOrElse "?"
+    logger.error(s"s$site: Replying database-not-reachable error to: $url [$errorCode]",
+          throwable)
 
     val (hasItStoppedPerhaps, fixProblemTips) =
       if (globals.isProd)

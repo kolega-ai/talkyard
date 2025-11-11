@@ -2698,7 +2698,7 @@ export class TyE2eTestBrowser {
 
     assertUrlIs(expectedUrl: string) {
       let url = this.#br.getUrl();
-      assert(url === expectedUrl);
+      tyAssert.eq(url, expectedUrl);
     }
 
     goToSearchPage(query?: string) {
@@ -6450,14 +6450,6 @@ export class TyE2eTestBrowser {
 
       openAdvancedEditor: () => {
         this.waitAndClick('.esC_Edtr_AdvB');
-      },
-
-      deleteChatMessageNr: (nr: PostNr) => {
-        const postSelector = `#post-${nr}`;
-        this.waitAndClick(`${postSelector} .s_C_M_B-Dl`);
-        this.waitAndClick('.dw-delete-post-dialog .e_YesDel');
-        this.waitUntilLoadingOverlayGone();
-        this.waitForVisible(`${postSelector}.s_C_M-Dd`);
       },
     };
 

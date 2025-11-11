@@ -42,5 +42,62 @@ case class UploadRef(
 }
 
 
+object UploadRef {
+
+  /** Not too much, not too little? And, ChatGPT says that:
+   * "ext4, NTFS, APFS all use 255 bytes per filename".
+   */
+  val MaxUploadedFileNameLen = 255
+}
+
+
 case class UploadInfo(sizeBytes: Int, mimeType: String, numReferences: Int)
 
+case class UploadInfoVb(
+  baseUrl: St,
+  hashPath: St,
+  sizeBytes: i32,
+  mimeType: St,
+  //numReferences: i32, — don't expose
+  uploadedFileName: Opt[St],  // oops, the [uploaded_file_name] is forgotten, always None
+  width: Opt[i32],
+  height: Opt[i32],
+  postId: Opt[PostId],
+  patId: Opt[PatId],
+  addedById: PatId,
+  addedAt: When,
+
+  // Currently loading Post:s and PageStuff:s separately. Maybe could load in the same
+  // SQL query (and join w those tables too), if that turns out to be faster?
+  // But seems there'd be a bit many  _another_join  then!?
+  // Anyway, then could include here in UploadInfoVb:
+  //
+  // Post tags? — _another_join and [array_agg]
+  // Category? — _another_join
+  //
+  // pageId: Opt[St],
+  // pageTitle? — but it's in posts3, _another_join?
+  // postNr: Opt[PostNr],
+  // postCreatedAt: Opt[When],
+  // postCreatedById: Opt[PatId],
+  // postAapprovedSource: Opt[St],
+  // postAapprovedHtmlSanitized: Opt[St],
+  // po.pinned_position,
+  // po.deleted_status,
+  // po.closed_status,
+  // po.hidden_at,
+  // po.num_pending_flags,
+  // po.num_handled_flags,
+  // po.num_like_votes,
+  // po.num_wrong_votes,
+  // po.num_times_read,
+  // po.num_bury_votes,
+  // po.num_unwanted_votes,
+  // po.type
+  )
+
+
+// Later? Info of interest to server admins? Which isn't incl in UploadInfoVb above
+// (so won't accidentally expose to single site admins).
+//
+// case class SrvUploadInfoVb(...)

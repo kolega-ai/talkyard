@@ -80,6 +80,7 @@ type WElm = WebdriverIO.Element;
 type WElmArr = WebdriverIO.ElementArray;
 type ElemRect = { x: number, y: number, width: number, height: number };
 
+type IsChatOrDisc = 'IsChat' | 'IsDisc';
 
 interface SnoozeTime {
   hours?: number;
@@ -3094,14 +3095,16 @@ export class TyE2eTestBrowser {
     /**
      * Useful if navigating to a new page, but don't know exactly when will have done that.
      */
-    async waitUntilPageHtmlSourceMatches_1 (toMatch: St | RegExp) {
+    async waitUntilPageHtmlSourceMatches_1 (toMatch: St | RegExp,
+            ps: { refreshBetween?: Bo } = {}) {
       // _1 = only for 1 this.#br
-      const regex = await getRegExpOrDie(toMatch);
+      const regex = getRegExpOrDie(toMatch);
       await this.waitUntil(async () => {
         const source = await this.#br.getPageSource();
         return regex.test(source);
       }, {
         message: `Waiting for page source to match:  ${regex}`,
+        ...ps,
       });
     }
 
@@ -7074,8 +7077,12 @@ export class TyE2eTestBrowser {
         await this.aboutUserDialog.waitForLoaded();
       },
 
-      clickMoreForPostNr: async (postNr: PostNr) => {  // RENAME to openMoreDialogForPostNr()?
-        await this.topic.clickPostActionButton(`#post-${postNr} + .esPA .dw-a-more`);
+      clickMoreForPostNr: async (postNr: PostNr, isWhat: IsChatOrDisc = 'IsDisc') => {  // RENAME to openMoreDialogForPostNr()?
+        // Buttons placed after the comment — but instead placed in header, if is chat message.
+        const sel = isWhat === 'IsDisc'
+              ? `#post-${postNr} + .esPA .dw-a-more`
+              : `#post-${postNr} .dw-a-more`;
+        await this.topic.clickPostActionButton(sel);
       },
 
       isPostMoreDialogVisible: async (): Pr<Bo> => {
@@ -7338,15 +7345,19 @@ export class TyE2eTestBrowser {
         // This opens  this.flagDialog.
       },
 
+      deletePost: async (postNr: PostNr) => {
+        await this.topic._deletePostImpl(postNr, 'IsDisc');
+      },
+
       __deletePostSelector: '.dw-a-delete',
 
-      deletePost: async (postNr: PostNr) => {
-        await this.topic.clickMoreForPostNr(postNr);
+      _deletePostImpl: async (postNr: PostNr, isWhat: IsChatOrDisc) => {
+        await this.topic.clickMoreForPostNr(postNr, isWhat);
         await this.waitAndClick(this.topic.__deletePostSelector);
         await this.waitAndClick('.dw-delete-post-dialog .e_YesDel');
         await this.waitUntilGone('.dw-delete-post-dialog');
         await this.waitUntilLoadingOverlayGone();
-        await this.topic.waitForPostVisibleAsDeleted(postNr);
+        await this.topic.waitForPostVisibleAsDeleted(postNr, isWhat);
       },
 
       canDeletePost: async (postNr: PostNr): Pr<Bo> => {
@@ -7571,8 +7582,13 @@ export class TyE2eTestBrowser {
         return await this.isVisible(`#post-${postNr}.s_P-Hdn`);
       },
 
-      waitForPostVisibleAsDeleted: async (postNr: PostNr) => {
-        await this.waitForDisplayed(this.topic.__deletedPostSel(postNr));
+      waitForPostVisibleAsDeleted: async (postNr: PostNr, isWhat?: IsChatOrDisc) => {
+        if (isWhat !== 'IsChat') {
+          await this.waitForDisplayed(this.topic.__deletedPostSel(postNr));
+        }
+        else {
+          await this.waitForVisible(`#post-${postNr}.s_C_M-Dd`);
+        }
       },
 
       isPostVisibleAsDeleted: async (postNr: PostNr): Pr<Bo> => {
@@ -7919,11 +7935,7 @@ export class TyE2eTestBrowser {
       },
 
       deleteChatMessageNr: async (nr: PostNr) => {
-        const postSelector = `#post-${nr}`;
-        await this.waitAndClick(`${postSelector} .s_C_M_B-Dl`);
-        await this.waitAndClick('.dw-delete-post-dialog .e_YesDel');
-        await this.waitUntilLoadingOverlayGone();
-        await this.waitForVisible(`${postSelector}.s_C_M-Dd`);
+        await this.topic._deletePostImpl(nr, 'IsChat');
       },
     };
 

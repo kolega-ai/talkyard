@@ -41,6 +41,11 @@
   <logger name="com.zaxxer.hikari" level="INFO"/>
   <logger name="org.flywaydb" level="INFO"/>
   <logger name="application-akka.actor" level="INFO"/>
+  <!-- Akka logs uninteresting noise with WARN severity, unfortunately. E.g. if a WebSocket
+  client disconnects. Maybe makes sense for an internal backed app, but not in Ty's case.
+  A discussion about that: https://discuss.akka.io/t/akka-http-log-levels-for-production/6101
+  All false positives make me ignore log messages altogether! Better make Akka quiet: -->
+  <logger name="akka" level="ERROR"/>
 
   <root level="INFO">
     <appender-ref ref="STDOUT"/>

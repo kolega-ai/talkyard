@@ -36,8 +36,7 @@ import talkyard.server.authz.{AuthzCtxOnPats, AuthzCtxOnAllWithReqer, AuthzCtxWi
 import talkyard.server.authz.{StaffReqrAndTgt, ReqrAndTgt, PatAndPrivPrefs}
 
 
-case class LoginNotFoundException(siteId: SiteId, userId: UserId)
-  extends QuickMessageException(s"User $siteId:$userId not found")
+case class LoginNotFound(siteId: SiteId, userId: UserId)
 
 
 case class ReadMoreResult(
@@ -1139,30 +1138,31 @@ trait UserDao {
   /**
     * Loads a user from the database.
     * Verifies that the loaded id match the id encoded in the session identifier,
-    * and throws NO *returns* a LoginNotFoundException on mismatch (happens e.g. if
+    * but returns a LoginNotFound on mismatch (happens e.g. if
     * I've connected the server to another backend, or access many backends
     * via the same hostname but different ports).
     */
-  def getUserBySessionId(sid: SidStatus): Option[Participant] Or LoginNotFoundException = {
-    Good(sid.userId map { sidUserId =>
+  def getUserBySessionId(sid: SidStatus, errCode: St): Opt[Pat] Or LoginNotFound = Good {
+    sid.userId map { sidUserId =>
       val user = getParticipant(sidUserId) getOrElse {
         // This might happen 1) if the server connected to a new database
         // (e.g. a standby where the login entry hasn't yet been
         // created), or 2) during testing, when I sometimes manually
         // delete stuff from the database (including login entries).
-        logger.warn(s"Didn't find user $siteId:$sidUserId [EdE01521U35]")
-        return Bad(LoginNotFoundException(siteId, sidUserId))
+        logger.warn(s"s$siteId: No user with session id '$sidUserId' [TyESESUSR1-$errCode]")
+        return Bad(LoginNotFound(siteId, sidUserId))
       }
       if (user.id != sidUserId) {
         // Sometimes I access different databases via different ports,
         // but from the same host name. Browsers, however, usually ignore
         // port numbers when sending cookies. So they sometimes send
         // the wrong login-id and user-id to the server.
-        logger.warn(s"DAO loaded the wrong user, session: $sid, user: $user [EdE0KDBL4]")
-        return Bad(LoginNotFoundException(siteId, sidUserId))
+        logger.warn(s"s$siteId: DAO loaded the wrong user, session: '$sid', user: ${
+              user} [TyESESUSR2-$errCode]")
+        return Bad(LoginNotFound(siteId, sidUserId))
       }
       user
-    })
+    }
   }
 
 

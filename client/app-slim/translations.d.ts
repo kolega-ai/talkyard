@@ -600,8 +600,6 @@ interface TalkyardTranslations {
     About_2: string;
     ScrollUpViewComments: string;
     Purpose: string;
-    edit: string;
-    delete: string;
     MessageDeleted: string;
     JoinThisChat: string;
     PostMessage: string;

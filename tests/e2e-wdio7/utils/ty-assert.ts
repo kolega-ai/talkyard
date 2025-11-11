@@ -221,7 +221,19 @@ const tyAssert = {
     //    "frame-ancestors http://e2e-test--ec-6697957.localhost:8080
     //                    https://e2e-test--ec-6697957.localhost:8080".
 
-    const ancErrMsg = 'ancestor violates the following Content Security Policy directive';
+
+    // 2025-11-03: Now Chrome has changed the wording from:
+    //   >  ancestor violates the following Content Security Policy directive
+    // to: (on a single line; I added whitespace)
+    //   >  security - Framing 'http://site-17l2fec9u1.localhost/' violates the following
+    //   >  Content Security Policy directive:
+    //   >  \"frame-ancestors http://e2e-test--....localhost:8080
+    //   >                   https://e2e-test--....localhost:8080\".
+    //   >  The request has been blocked.\n"`
+    //
+    // Let's skip "Framing '...'" for now, start matching at "violates the ...".
+    //
+    const ancErrMsg = ' violates the following Content Security Policy directive';
     const fullMsg = ancErrMsg + `: "${okayAncestors}"`;
     const msgs = await brX.getLogs_worksInChrome('browser');
     logMessage(`\nBrowser log messages: ${msgs.map(m => j2s(m))}\n`);
@@ -241,7 +253,12 @@ const tyAssert = {
 
     if (numMatches !== 1) {
       logUnusual(`Browser log messages: ` + msgs.map(m => j2s(m)));
-      assert.fail(`No ancestor-violates browser error log message?  (Or? See above)`)
+      logUnusual(`Was looking for: ancErrMsg:  "${ancErrMsg}"`);
+      logUnusual(`                 fullMsg:   "${fullMsg}"`);
+      assert.fail((numMatches
+              ? `Too many ancestor-violates browser error log messages`
+              : `No ancestor-violates browser error log message`
+                  ) + `: numMatches = ${numMatches}`);
     }
   },
 };

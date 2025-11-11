@@ -196,6 +196,7 @@ export default {
   SquashSiblingIndexLimitDepth1: 12,
   SquashSiblingIndexLimitDepth2: 12 / 2,
   SquashSiblingIndexLimitDepth3: 12 / 4,
+  ProgressLayoutEnabled: 1,
   UnknownUserId: -3,
   NoUserId: 0,
   SystemUserId: 1,
@@ -207,6 +208,7 @@ export default {
   EveryoneId: 10,
   AllMembersId: 11,
   AllMembersUsername: 'all_members',
+  AllMembersFullName: 'All Members',
   BasicMembersId: 12,
   FullMembersId: 13,
   FullMembersFullName: 'Full Members',
@@ -251,6 +253,8 @@ export default {
 
   SortOrderBestFirst: 1,
   SortOrderOldestFirst: 3,
+
+  EmptyAtomDocLen: 847,  // see [Atom_feed_Scala_code]
 
   thirdParty: {
     ghostPort: 2368,

@@ -69,6 +69,10 @@ describe("new member, allow, approve posts:  TyT4AKBJ20", () => {  // RENAME ths
     // can post how many posts hen wants to (subjected to new user rate limits).
     site.settings.numFirstPostsToApprove = 2;
     site.settings.maxPostsPendApprBefore = 4;
+
+    // We add a _Progress_Note below.
+    site.settings.progressLayout = c.ProgressLayoutEnabled;
+
     site.members.push(maja);
     site.members.push(michael);
 
@@ -356,6 +360,7 @@ describe("new member, allow, approve posts:  TyT4AKBJ20", () => {  // RENAME ths
     majasBrowser.go(topics.oldTopicUrl);
     majasBrowser.complex.loginWithPasswordViaTopbar(maja);
     majasBrowser.complex.replyToOrigPost("My more replies");
+    // _Progress_Note:
     majasBrowser.complex.addProgressReply("My even more replies");
     majasBrowser.topic.assertPostNotPendingApproval(5);
     majasBrowser.topic.assertPostNotPendingApproval(6, { wait: false });

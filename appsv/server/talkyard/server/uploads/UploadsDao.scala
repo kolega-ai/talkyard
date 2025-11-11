@@ -15,7 +15,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package debiki.dao
+package talkyard.server.uploads
 
 import scala.collection.Seq
 import com.debiki.core._
@@ -23,8 +23,10 @@ import com.debiki.core.Prelude._
 import com.google.{common => guava}
 import debiki.{Globals, ImageUtils, TextAndHtmlMaker}
 import debiki.EdHttp._
+import debiki.dao.SiteDao
 import talkyard.server.UploadsUrlBasePath
 import talkyard.server.rendr.NashornParams
+import talkyard.server.authz.AdminReqrAndTgt
 import java.{io => jio, lang => jl, util => ju}
 import java.awt.image.BufferedImage
 import java.nio.{file => jf}
@@ -49,6 +51,9 @@ trait UploadsDao {
     * The reason for the slashes is that then all uploads won't end up in the same
     * directory, if stored on localhost (some file systems don't want 99999 files in a
     * single directory).
+    *
+    * @param uploadedFileName BUG Harmless: The [uploaded_file_name] is forgotten before we've
+    * saved the new post and added a row in  upload_refs3.
     */
   def addUploadedFile(uploadedFileName: St, tempFile: jio.File, uploadedById: TrueId,
         browserIdData: BrowserIdData): UploadRef = {
@@ -322,6 +327,13 @@ trait UploadsDao {
       throwIfTooMuch(bytesUploadedLastDay, maxBytesDay, "24 hours")
     }
   }
+
+
+  def listUploads(reqTgt: AdminReqrAndTgt): Seq[UploadInfoVb] = {
+    this.readTx { tx =>
+      tx.listUploads()
+    }
+  }
 }
 
 
@@ -360,6 +372,14 @@ object UploadsDao {
     """^(video/)?[0-9][0-9]?/[a-z0-9]/[a-z0-9]{2}/[a-z0-9]+\.[a-z0-9]+$""".r
 
   val HlsVideoMediaSegmentsSuffix = ".m3u8"
+
+  /** Images and .pdf. */
+  val CommonImageFileSuffixes = Set(
+        "tif", "tiff", "gif", "jpeg", "jpg", "jif", "jfif", "jp2", "jpx", "j2k", "j2c",
+        "fpx", "pcd", "png", "mpo", "pdf", "webp", "avif")
+
+  /** See: https://en.wikipedia.org/wiki/Video_file_format. */
+  val CommonVideoFileSuffixes = Set("webm", "mkv", "ogv", "ogg", "gifv", "mp4", "m4v")
 
   private val Log4 = math.log(4)
 
@@ -478,13 +498,10 @@ object UploadsDao {
     // (Convert to lowercase, don't want e.g. both .JPG and .jpg.)
     val suffix = fileName.takeRightWhile(_ != '.').toLowerCase
 
-    // Common image file formats:
-    // (https://www.library.cornell.edu/preservation/tutorial/presentation/table7-1.html)
-    if ("tif tiff gif jpeg jpg jif jfif jp2 jpx j2k j2c fpx pcd png pdf".contains(suffix))
+    if (CommonImageFileSuffixes.contains(suffix))
       return suffix
 
-    // Common movie file formats: (https://en.wikipedia.org/wiki/Video_file_format)
-    if ("webm mkv ogv ogg gifv mp4 m4v".contains(suffix))
+    if (CommonVideoFileSuffixes.contains(suffix))
       return suffix
 
     if (!fileName.exists(_ == '.'))

@@ -180,9 +180,10 @@ class SubscriberController @Inject()(cc: ControllerComponents, tyCtx: TyContext)
 
     dao.perhapsBlockRequest(request, sessionId, anyBrowserId)
 
-    val anyRequester: Option[Participant] =
-          dao.getUserBySessionId(sessionId) getOrIfBad { ex =>
-            throw ex
+    val anyRequester: Opt[Pat] =
+          dao.getUserBySessionId(sessionId, errCode = "TyEWSSESUSR1") getOrIfBad { _ =>
+            return Bad(ForbiddenResult("TyEWSSESUSR2", "No user with the specified session id")
+                    .discardingCookies(security.DiscardingSessionCookies: _*))
           }
 
     val requesterMaybeSuspended: User = anyRequester getOrElse {

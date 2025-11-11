@@ -15,13 +15,14 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package debiki.dao
+package talkyard.server.uploads
 
 import java.io.RandomAccessFile
 import com.debiki.core._
 import com.debiki.core.Prelude._
 import debiki.EdHttp.ResultException
 import debiki.TitleSourceAndHtml
+import debiki.dao.DaoAppSuite
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.must
 import java.{io => jio}

@@ -146,12 +146,13 @@ sealed abstract class PostType(
 }
 
 
-// REFACTOR. See harmless bug below. Should change *some* types to a bit field,
+// REFACTOR. See harmless bug below. Should change *some* types to a bit field [post_flag_or_type]
 // or split into separate fields.
 // The title should be it's own type. Maybe title and OP will be -1 and 1?
 // And comments 2, meta posts 3?
 // But types Bookmark, Flag, Comment, Meta Comment still make sense?
 // (Can't be both a bookmark and a flag, for example.)
+// What about wiki posts: Should that be a flag, or a post type? [wiki_flag_or_type]
 //
 // Currently types 1-12 are used in discussions  [depr_post_type],
 // and can be tagged and bookmarked. SHOULD change to 1-31? Why not be able to
@@ -205,7 +206,9 @@ object PostType {
     * Need to either 1) let PostType be a bit field, and 1 bit is the page section
     * (discussion or progress section), and one bit is 0 = not wiki, 1 = yes wiki.
     * Or 2) split PostType into separate fields:  isWiki: Boolean,  isProgressPost: Boolean.
-    * And  isChatmessage could also be its own dedicated bit.
+    * And  isChatMessage could also be its own dedicated bit   [post_flag_or_type]
+    *   — or, isn't it better if all posts on a Chat page are chat messages, automatically,
+    *   skip the separate post type field.
     */
   @deprecated("This should be a flag instead, not a separate post type.")
   case object CommunityWiki extends PostType(12) {

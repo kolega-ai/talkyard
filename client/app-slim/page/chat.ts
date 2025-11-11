@@ -379,76 +379,54 @@ const ChatMessage = createComponent({
   displayName: 'ChatMessage',
 
   getInitialState: function() {
-    return { isEditing: false };
-  },
-
-  edit: function() {
-    this.setState({ isEditing: true });
-    const post: Post = this.props.post;
-    // Later: Pass alias, if any.  [anon_chats]
-    editor.openToEditPostNr(post.nr, (wasSaved, text) => {
-      this.setState({ isEditing: false });
-    });
-  },
-
-  delete_: function(event: MouseEvent) {
-    // Later: [anon_chats].
-    morebundle.openDeletePostDialog({ post: this.props.post, at: cloneEventTargetRect(event) });
+    return {};
   },
 
   render: function() {
-    const state = this.state;
     const store: Store = this.props.store;
-    const me: Myself = store.me;
     const post: Post = this.props.post;
     const author: BriefUser = store_getAuthorOrMissing(store, post);
     const headerProps: any = { store, post };
     headerProps.isFlat = true;
     headerProps.exactTime = true;
 
-    const isMine = me.id === author.id ||
-        // And, for now, for new post previews: [305KGWGH2]
-        author.id === UnknownUserId;
-    const isMineClass = isMine ? ' s_My' : '';
+    // Later: Need to pass any alias, if editing or deleting?  [anon_chats]
+    headerProps.stuffToAppend = PostActions({ store, post });
 
-    const mayDelete = post.postType === PostType.ChatMessage && !state.isEditing &&
-        !post.isPreview && (isMine || isStaff(me));
-    const mayEdit = mayDelete && !store.isEditorOpen;
+    // Editor open, editing *another* post? (might be on another page even)
+    const isEditingOtherPost = store.editingPostId &&
+              store.editingPostId !== post.uniqueId;
 
-    if (mayEdit || mayDelete) {
-      headerProps.stuffToAppend = rFragment({},
-        !mayEdit ? null :
-          r.button({ className: 's_C_M_B s_C_M_B-Ed icon-edit' + isMineClass,
-              onClick: this.edit },
-            t.c.edit),
-        // (Don't show a trash icon, it'd make the page look too cluttered.)
-        !mayDelete ? null :
-          r.button({className: 's_C_M_B s_C_M_B-Dl' + isMineClass,
-              onClick: this.delete_ },
-            t.c.delete));
-    }
+    // If we've 1) started typing a chat message, and then 2) started editing sth else
+    // instead, then, let's gray out & dim the chat message preview. [inactive_chat_prv]
+    // But let's not remove it — people could mistakenly believe their draft was lost?
+    const previewInactive = post.isPreview && isEditingOtherPost;
+    const previewInactiveClass = previewInactive ?
+            // Maybe could use s_P-Prvw-NotEd, but it's for threaded discussion comments,
+            // bit different html structure. Let's instead, for now at least:
+            ' n_0Ed' : '';   // 0Ed = not (0) currently EDiting this preview
 
-    const isPreviewClass = post.isPreview ? ' s_C_M-Prvw' : '';
+    const isPreviewClass = post.isPreview ?
+              ' s_C_M-Prvw' + previewInactiveClass : '';
 
-    //headerProps.stuffToAppend.push(
-    //  r.button({ className: 'esC_M_MoreB icon-ellipsis', key: 'm' }, "more"));
     const chatMessage = (
       r.div({ className: 'esC_M' + isPreviewClass, id: 'post-' + post.nr },
         avatar.Avatar({ user: author, origins: store, size: AvatarSize.Small }),
         PostHeader(headerProps),
         PostBody({ store: store, post: post })));
 
+    // Editing existing message, or composing a new?
     const isEditingExistingPost = post.nr >= MinRealPostNr;
 
     const anyPreviewInfo = !post.isPreview ? null :
-        r.div({ className: 's_T_YourPrvw' },
+        r.div({ className: 's_T_YourPrvw' + previewInactiveClass },
           t.e.PreviewC + ' ',
           r.span({ className: 's_T_YourPrvw_ToWho' },
             isEditingExistingPost ?
             t.d.YourEdits : t.d.YourChatMsg));
 
     return (anyPreviewInfo ?
-        rFragment({}, anyPreviewInfo, chatMessage) : chatMessage);
+        rFr({}, anyPreviewInfo, chatMessage) : chatMessage);
   }
 });
 
@@ -552,7 +530,6 @@ interface ChatMessageEditorState {
   isSaving?: boolean;
   isLoading?: boolean;
   rows: number;
-  advancedEditorInstead?: boolean;
   previewYPos: number;
   scriptsLoaded?: boolean;
 }
@@ -629,8 +606,10 @@ const ChatMessageEditor = createFactory<any, ChatMessageEditorState>({
     // Tested here: TyT7JKMW24
     // A bit dupl code [4ABKR2J0]
 
+    const store: Store = this.props.store;
+
     // Don't save draft from both here, and the advanced editor — then might get dupl drafts. [TyT270424]
-    if (this.state.advancedEditorInstead)
+    if (store.isEditorOpen)
       return;
 
     // If we're closing the page, do try saving anyway, using becaon, because the current non-beacon
@@ -638,7 +617,6 @@ const ChatMessageEditor = createFactory<any, ChatMessageEditorState>({
     if (this.isSavingDraft && !useBeacon)
       return;
 
-    const store: Store = this.props.store;
     const me: Myself = store.me;
 
     const oldDraft: Draft | undefined = this.state.draft;
@@ -728,7 +706,7 @@ const ChatMessageEditor = createFactory<any, ChatMessageEditorState>({
     this.updateText(event.target.value);
   },
 
-  updateText: function(text, draftWithStatus?: { draft, draftStatus }) {
+  updateText: function(text, draftWithStatus?: { draft, draftStatus }, closingAdvEd?: Bo) {
     const store: Store = this.props.store;
     const state: ChatMessageEditorState = this.state;
 
@@ -745,8 +723,9 @@ const ChatMessageEditor = createFactory<any, ChatMessageEditorState>({
     const textChanged = state.text !== text;
     const textNowEmpty = !text;  // isBlank(text); ?
 
-    // COULD use store.isEditorOpen instead — but I think it hasn't been updated yet?
-    if (textChanged && !this.state.advancedEditorInstead) {
+    // (When closing the advanced editor, `store.isEditorOpen` is still true — we then look at
+    // `closingAdvEd` instead.)
+    if (textChanged && (!store.isEditorOpen || closingAdvEd)) {
       if (textNowEmpty) {
         ReactActions.hideEditorAndPreview({});
       }
@@ -839,16 +818,12 @@ const ChatMessageEditor = createFactory<any, ChatMessageEditorState>({
   },
 
   useAdvancedEditor: function() {
-    this.setState({ advancedEditorInstead: true });
     const state = this.state;
     editor.openToWriteChatMessage(state.text, state.draft, state.draftStatus,
           (wasSaved, text, draft, draftStatus) => {
       if (this.isGone) return;
-      // Now the advanced editor has been closed.
-      this.setState({
-        advancedEditorInstead: false,
-      });
-      this.updateText(wasSaved ? '' : text, { draft, draftStatus });
+      // Now the advanced editor is still open, but getting closed.
+      this.updateText(wasSaved ? '' : text, { draft, draftStatus }, true /*closingAdvEd*/);
       if (wasSaved) {
         this.props.scrollDownToViewNewMessage();
       }
@@ -857,10 +832,7 @@ const ChatMessageEditor = createFactory<any, ChatMessageEditorState>({
 
   render: function () {
     const store: Store = this.props.store;
-
-    if (store.isEditorOpen || !this.state.scriptsLoaded ||
-        // Can remove this check now? using  isEditorOpen  above instead
-        this.state.advancedEditorInstead)
+    if (store.isEditorOpen || !this.state.scriptsLoaded)
       return null;
 
     const state: ChatMessageEditorState = this.state;

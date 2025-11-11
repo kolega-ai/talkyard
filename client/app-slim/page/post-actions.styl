@@ -106,6 +106,32 @@
     margin: 0 !important;
     padding: 12px;
 
+.esC_M
+  .s_P_H_Bm.dw-p-mark-click
+    margin: 0 0 0 2px;
+
+.esC_M .dw-p-as
+  display: inline;
+
+  & > .dropdown,
+  .dw-a
+    float: none;
+
+  .dw-a
+    // 45% instead of 55%. I think that's better — maybe because there's other text
+    // just before the icons, in the header (the author's name, and posted-at), not just
+    // whitespace, so maybe it's better if the icons too are a bit darker? (Since they
+    // "compete" with the text.)
+    color: hsl($uiHue, 0%, 45%);
+
+    // Similar to the bookmark icon  [dupl_hdr_icn]
+    padding: 5px;
+    margin-left: 4px;
+
+    &:hover   // [dupl_hover]
+      outline: 2px solid hsl($uiHue, 100%, 77%);
+      background: hsl($uiHue, 100%, 97%);
+
 .esDropModal .dw-a,
 .dw-t > .dw-p-as .dw-a
   padding: 8px 9px 14px 9px;

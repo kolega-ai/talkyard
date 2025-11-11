@@ -303,6 +303,18 @@ input, textarea {
   .modal-dialog
     width: 630px;  // else 600, Bootstrap's default
 
+.modal .modal-content
+  // Oddly enough, React-Bootstrap uses <h4> for modal dialog titles. So we'll use <h5> inside?
+  h4
+    font-size: 18px;
+  h5, h6
+    font-size: 16px;
+    margin-top: 0;
+    color: #000;
+
+  button + p
+    margin-top: 0.5em;
+
 // If we're in some popup or small win, better show scrollbars if needed.  [e2e_win_size]
 // Does it make sense to show only in small wins?
 // Like so: @media (max-height: 1000px)

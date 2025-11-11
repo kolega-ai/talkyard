@@ -127,7 +127,7 @@ class SafeActions(val globals: Globals, val security: EdSecurity, parsers: PlayB
               exceptionThrown = false
               fr
             }
-            catch HttpResults(request, globals).exceptionToSuccessResultHandler
+            catch HttpResults(request, globals, site = None).exceptionToSuccessResultHandler
             finally {
               if (exceptionThrown) {
                 tracerSpan.finish()
@@ -135,7 +135,8 @@ class SafeActions(val globals: Globals, val security: EdSecurity, parsers: PlayB
             }
 
       // "_Catch" async failures too.
-      futureResult = futureResult recover HttpResults(request, globals).exeptionToResultHandler
+      futureResult = futureResult recover HttpResults(
+                            request, globals, site = None).exeptionToResultHandler
 
       val anyNewFakeIp = request.queryString.get("fakeIp").flatMap(_.headOption)
 

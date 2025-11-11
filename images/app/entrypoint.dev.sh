@@ -40,13 +40,13 @@ if [ $file_owner_id -ne 0 ] ; then
   # Prevent a file-not-found exception in case ~/.ivy2 and ~/.sbt didn't exist, so Docker
   # created them resulting in them being owned by root:
   # (/home/owner/.ivy2, .sbt and .coursier are mounted in docker-compose.yml [SBTHOME])
-  chown owner.owner /home/owner
-  chown -R owner.owner /home/owner/.ivy2
-  chown -R owner.owner /home/owner/.sbt
-  chown -R owner.owner /home/owner/.cache
+  chown owner:owner /home/owner
+  chown -R owner:owner /home/owner/.ivy2
+  chown -R owner:owner /home/owner/.sbt
+  chown -R owner:owner /home/owner/.cache
   # Make saving-uploads work (this dir, mounted in docker-compose.yml, shouldn't be owned by root).
-  chown -R owner.owner /opt/talkyard/uploads
-  chown -R owner.owner /var/log/talkyard
+  chown -R owner:owner /opt/talkyard/uploads
+  chown -R owner:owner /var/log/talkyard
 
   # Here, 'exec gosu owner $*' will:
   # 1) run $* as user owner, which has the same user id as the file owner on the Docker host

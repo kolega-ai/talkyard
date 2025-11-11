@@ -15,24 +15,28 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package controllers
+package talkyard.server.uploads
 
 import scala.collection.Seq
 import com.debiki.core._
 import com.debiki.core.Prelude._
 import debiki._
 import debiki.EdHttp._
-import debiki.dao.UploadsDao._
+import debiki.dao.PageStuff
 import talkyard.server.{TyContext, TyController}
 import talkyard.server.http.ApiRequest
 import talkyard.server.authn.MinAuthnStrength
+import talkyard.server.JsX
 import java.{io => jio}
 import javax.inject.Inject
 import play.api._
 import play.api.libs.Files
-import play.api.libs.json.{JsString, JsValue, Json}
+import play.api.libs.json.{JsArray, JsNumber, JsString, JsValue, Json}
+import talkyard.server.JsX.{JsInt32OrNull, JsStringOrNull, JsTagTypeArray}
 import play.api.mvc._
 import play.api.mvc.MultipartFormData.FilePart
+import scala.collection.{mutable => mut}
+import UploadsDao._
 
 /** Uploads files and serves uploaded files.
   */
@@ -154,7 +158,7 @@ class UploadsController @Inject()(cc: ControllerComponents, edContext: TyContext
     val file: jio.File = filePart.ref.path.toFile
 
     val uploadRef = dao.addUploadedFile(
-          filePart.filename, file, request.theReqerTrueId, request.theBrowserIdData)
+          uploadedFileName = filePart.filename, file, request.theReqerTrueId, request.theBrowserIdData)
 
     // Delete the temporary file. (It will be gone already, if we couldn't optimize it,
     // i.e. make it smaller, because then we've moved it to the uploads dir (rather than
@@ -331,6 +335,116 @@ class UploadsController @Inject()(cc: ControllerComponents, edContext: TyContext
         NotFoundResult("DwE404FNF0", "File not found")
     }
   } */
+
+
+  def listUploads: Action[JsValue] = PostJsonAction(
+            RateLimits.ExpensiveGetRequest,
+            maxBytes = 500) { req =>
+    import req.dao
+
+    // Work in progress. There's not yet any UI, no auto tests. [manage_uploads_wip]
+    untestedIf(context.globals.isProd, "TyE703SKLK",
+          "listUploads endpoint not finished, and my phoenix bird is in a frenzy")
+
+    val uploads: Seq[UploadInfoVb] =
+          dao.listUploads(req.reqrTargetSelf.denyUnlessAdmin())
+
+    val postIdsWithUploads = uploads.flatMap(_.postId)
+
+    val (postsById, pageStuffById) = dao.readTx { tx =>
+      val postsById: Map[PostId, Post] = tx.loadPostsByUniqueId(postIdsWithUploads)
+      val pageIdsWithUploads = postsById.values.map(_.pageId)
+      val pageStuffById: Map[PageId, PageStuff] = dao.loadPageStuffById(pageIdsWithUploads, tx)
+      (postsById,
+          pageStuffById)
+    }
+
+    // Dupl code [mk_tag_types_set]
+    def getTagTypeIds: Set[TagTypeId] = {
+      val ids = mut.HashSet.empty[TagTypeId]
+      UX; SHOULD // incl tags on comments too, not just the page?
+      for (pageStuff <- pageStuffById.valuesIterator; tag <- pageStuff.pageTags) {
+        ids.add(tag.tagTypeId)
+      }
+      ids.to(Set)
+    }
+
+    val tagTypeIds: Set[TagTypeId] = getTagTypeIds
+    val tagTypes: Seq[TagType] = dao.getTagTypesForIds(tagTypeIds)
+
+    val uploadsJsArr = JsArray(uploads.map { u =>
+      var uplJs = Json.obj(
+          "baseUrl" -> JsString(u.baseUrl),
+          "hashPath" -> JsString(u.hashPath),
+          "sizeBytes" -> JsNumber(u.sizeBytes),
+          "mimeType" -> JsString(u.mimeType),
+
+          // Don't incl. Is for whole server, not this site. Server private.
+          // numReferences = getInt32(rs, "num_references"),
+
+          "uploadedFileName" -> JsStringOrNull(u.uploadedFileName),
+          "width" -> JsInt32OrNull(u.width),
+          "height" -> JsInt32OrNull(u.height),
+
+          "postId" -> JsInt32OrNull(u.postId),
+          "patId" -> JsInt32OrNull(u.patId),
+
+          "addedById" -> JsNumber(u.addedById),
+          "addedAtMs" -> JsNumber(u.addedAt.millis)
+
+          // Also?:
+          // "page_id" -> page_id,
+          // page name
+          // category name, ancestor cat names?
+          // "post_nr" -> post_nr,
+          // "created_at" -> created_at,
+          // "created_by_id" -> created_by_id,
+          // -- po.approved_source,
+          // "approved_html_sanitized" -> approved_html_sanitized,
+          // -- po.curr_rev_source_patch,
+          // "pinned_position" -> pinned_position,
+          // "deleted_status" -> deleted_status,
+          // "closed_status" -> closed_status,
+          // "hidden_at" -> hidden_at,
+          // "num_pending_flags" -> num_pending_flags,
+          // "num_handled_flags" -> num_handled_flags,
+          // "num_like_votes" -> num_like_votes,
+          // "num_wrong_votes" -> num_wrong_votes,
+          // "num_times_read" -> num_times_read,
+          // "num_bury_votes" -> num_bury_votes,
+          // "num_unwanted_votes" -> num_unwanted_votes,
+          // "type" -> type
+          )
+
+      for {
+        postId <- u.postId
+        post <- postsById.get(postId)
+      } {
+        uplJs += "post" -> JsX.JsPostInclDetails(post)
+        for (page <- pageStuffById.get(post.pageId)) {
+          //import talkyard.server.parser.JsonConf
+          uplJs += "page" -> JsX.JsPageMeta(page.pageMeta)
+              //  Look at the List API, or the search engine:  [list_pages_found].
+              // talkyard.server.api.ThingsFoundJson.JsPageFound( ...)
+              // or  Json.obj("pageTitle" -> ___, ...)
+        }
+      }
+      uplJs
+    })
+
+    val jsonResp = Json.obj(
+        // Bit dupl code [store_patch_resp]
+        "storePatch" -> Json.obj(
+            // Later, excl private-visibility tags here. [priv_tags]
+            "tagTypes" -> JsTagTypeArray(tagTypes,
+              inclRefId = false), // req.requester.exists(_.isStaff)), // [who_sees_refid]
+            // And excl private users here, [private_pats]
+            // and in  authorId & assigneeIds fields below.
+            "usersBrief" -> JsArray.empty), // later: authors.map(JsPatNameAvatar))),
+        "uploads" -> uploadsJsArr)
+
+    talkyard.server.http.OkSafeJson(jsonResp)
+  }
 
 }
 

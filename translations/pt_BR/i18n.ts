@@ -681,8 +681,6 @@ var t_pt_BR: TalkyardTranslations = t = {
     About_2: ", criado por ",
     ScrollUpViewComments: "Role para cima para ver comentários anteriores",
     Purpose: "Propósito:",
-    edit: "editar",
-    'delete': "deletar",
     MessageDeleted: "(Mensagem deletada)",
     JoinThisChat: "Associar-se a este chat",
     PostMessage: "Postar mensagem",

@@ -250,6 +250,7 @@ export const PostActions = createComponent({
     const isThisPageDeleted = !!page.pageDeletedAtMs;  // ignore deleted categories
     const canBeSolved = page_canBeSolved(page);
     const isEmbeddedComments = page.pageRole === PageRole.EmbeddedComments;
+    const isChatPage = page_isChat(page.pageRole);
 
     const me: Me = store.me;
     const myPageData: MyPageData = me.myCurrentPageData;
@@ -286,7 +287,7 @@ export const PostActions = createComponent({
     if (post_shallRenderAsDeleted(post) || isCollapsed)
       return r.div({ className: 'dw-p-as dw-as' });
 
-    let acceptAnswerButton;
+    let acceptAnswerButton: RElm | U;
     if (deletedOrCollapsed) {
       // Show no accept-as-answer button.
       // (But if is edits preview? Then it's ok click Accept, whilst editing.)
@@ -314,7 +315,10 @@ export const PostActions = createComponent({
     const replyingToClass = store_isReplyingTo(store, post)  ? ' s_PA_B-Active' : '';
     const disabledClass = isEditorOpenAlready ? ' s_PA_B-Disabled' : '';
 
-    const replyButton = !store_mayIReply(store, post) ? null :  // or  <span .e_MayNotRe> ?
+    // (Move !isChatPage to inside store_mayIReply()?)
+    // Chat messages currently don't have any replies [chat_replies], instead people
+    // @mention each other.
+    const replyButton = isChatPage || !store_mayIReply(store, post) ? null :  // or  <span .e_MayNotRe> ?
           r.a({ className: 'dw-a dw-a-reply ' + makeReplyBtnIcon(store)
                 + disabledClass + replyingToClass,
               // Highlight the post this Reply button replies to.
@@ -336,10 +340,14 @@ export const PostActions = createComponent({
 
     // Votes can be disabled for blog posts only, right now, [POSTSORDR]
     // except for the Disagree vote which can be disabled everywhere.
+    // Chat pages don't use votes (at least not now).
     const isEmbOrigPost = isEmbeddedComments && isPageBody;
-    const useDownvotes = !isEmbOrigPost || page.origPostVotes === OrigPostVotes.AllVotes;
-    const useLikeVote  = !isEmbOrigPost || page.origPostVotes !== OrigPostVotes.NoVotes;
-    const isDisagreeEnabled = page_voteTypeEnabled(page, post, PostVoteType.Disagree);
+    const useDownvotes =
+            !isChatPage && (!isEmbOrigPost || page.origPostVotes === OrigPostVotes.AllVotes);
+    const useLikeVote =
+            !isChatPage && (!isEmbOrigPost || page.origPostVotes !== OrigPostVotes.NoVotes);
+    const isDisagreeEnabled =
+            !isChatPage && page_voteTypeEnabled(page, post, PostVoteType.Disagree);
 
     // If isn't staff, then the only "downvote" is the Disagree vote.
     const canDownvote = useDownvotes && (isDisagreeEnabled || isStaff(me));
@@ -395,7 +403,7 @@ export const PostActions = createComponent({
       // without some CSS tweaks.
       // Enable when fixing [DBLINHERIT]?  [OPDOWNV]
       downvotesDropdown = isPageBody || !canDownvote ? null :
-          r.span({ className: 'dropdown navbar-right', title: t.pa.MoreVotes,
+          r.span({ className: 'dropdown', title: t.pa.MoreVotes,
               onClick: this.openMoreVotesDropdown },
             r.a({ className: 'dw-a dw-a-votes' + myOtherVotes }, ''));
 
@@ -430,8 +438,8 @@ export const PostActions = createComponent({
     // that menu item instead. — This stuff makes no sense for an embedded discussion orig-post
     // and gets hidden by CSS [5UKWBP2] (but not here because then React messes up the markup
     // when merging server and client side markup).
-    let flagBtn;
-    let moreDropdown;
+    let flagBtn: RElm | U;
+    let moreDropdown: RElm | U;
     if (isEditingThisPost) {
       // Skip the Flag and More buttons — doing such things when the post is being
       // edited, could have weird effects?  E.g. More + Delete, or + Move-to-other-page,
@@ -441,7 +449,7 @@ export const PostActions = createComponent({
     }
     else if (me.isLoggedIn) {
       moreDropdown =
-        r.span({className: 'dropdown navbar-right', onClick: this.openMoreDropdown},
+        r.span({className: 'dropdown', onClick: this.openMoreDropdown},
           r.a({className: 'dw-a dw-a-more icon-menu', title: t.MoreDots}));
     }
     else if (!isOwnPost && !deletedOrCollapsed) {
@@ -465,7 +473,7 @@ export const PostActions = createComponent({
     // BUG  if deleting page —> mod task completed, then undeleting —>   [undel_posts]
     //   now  post.isApproved is false (was rejected),  mod task done,
     //   but mod buttons still visible :-(
-    let approveOrDeleteBtns;  // [in_pg_apr]
+    let approveOrDeleteBtns: RElm | U;  // [in_pg_apr]
     if (!deletedOrCollapsed && !post.isApproved && isStaff(me)
           && !isOrigPostAndPageDeleted) {
       const ModBtn = (decision: ReviewDecision, title: St, clazz: St) => {
@@ -502,23 +510,34 @@ export const PostActions = createComponent({
             );
     }
 
-    return (
-      r.div({ className: 'dw-p-as dw-as esPA', onClick: this.props.onClick },
-        replyButton,
-        changeButton,
-        adminLink,
-        flagBtn,
-        moreDropdown,
-        link,
-        editButton,
-        downvotesDropdown,
-        likeVoteButton,
-        numBurysText,
-        numWrongsText,
-        numLikesText,
-        numUnwantedsText,
-        acceptAnswerButton,
-        approveOrDeleteBtns));
+    const res = isChatPage
+        ? r.div({ className: 'dw-p-as dw-as esPA' },
+              // No float: right. [chat_btn_order]
+              // There's a bookmark button in the header, it'll be just before `link`,
+              // see: s_P_H_Bm.
+              // There's no Reply button, we use @mentions instead of [chat_replies].
+              link,
+              editButton,
+              moreDropdown)
+        : r.div({ className: 'dw-p-as dw-as esPA', onClick: this.props.onClick },
+              // This has float: right.
+              replyButton,
+              changeButton,
+              adminLink,
+              flagBtn,
+              moreDropdown,
+              link,
+              editButton,
+              downvotesDropdown,
+              likeVoteButton,
+              numBurysText,
+              numWrongsText,
+              numLikesText,
+              numUnwantedsText,
+              acceptAnswerButton,
+              approveOrDeleteBtns);
+
+    return res;
   }
 });
 
@@ -846,16 +865,16 @@ const MoreDropdownModal = createComponent({
     const settings: SettingsVisibleClientSide = store.settings;
     const page: Page = store.currentPage;
     const isFlat = store['isFlat']; // hmm shouldn't place in the store object, oh well
+    const isChatPage = page_isChat(page.pageRole);
     const me: Myself = store.me;
     const post: Post = this.state.post;
     const isForumSite = settings.enableForum !== false;
     const isPageBody = post.nr === BodyNr;
     const isPostDeleted = post_isDeleted(post);
-    const isPageDeleted = page.pageDeletedAtMs;
 
     const moreLinks = [];
     const isOwnPost = pat_isAuthorOf(me, post, store.usersByIdBrief);
-    const isMindMap = page.pageRole === PageRole.MindMap;
+    //nst isMindMap = page.pageRole === PageRole.MindMap;
 
     // ----- Report
 
@@ -872,6 +891,7 @@ const MoreDropdownModal = createComponent({
      */
 
     /*  Find some better way to do this. And also, don't show so many buttons below More.
+        And don't forget to skip chat pages, !isChatPage.
      if (!post.isTreeCollapsed && !isPageBody && user.isAdmin && isKajMagnusSite)
      moreLinks.push(
      r.a({ className: 'dw-a dw-a-collapse-tree icon-collapse',
@@ -907,7 +927,7 @@ const MoreDropdownModal = createComponent({
 
     // ----- Tags
 
-    if (pat_mayEditTags(me, { forPost: post, store })) {
+    if (pat_mayEditTags(me, { forPost: post, store }) && !isChatPage) {
       moreLinks.push(
         r.a({ className: 'dw-a icon-plus', onClick: this.openTagsDialog, key: 'ts' },
           t.pa.AddTags));
@@ -929,7 +949,7 @@ const MoreDropdownModal = createComponent({
 
     // UX BUG: Wikified posts no longer looks good, because of the avatar icon to the left.
     // Only the orig post looks ok.
-    if ((isStaff(me) || isOwnPost) && !isFlat && isForumSite && !isPostDeleted) {
+    if ((isStaff(me) || isOwnPost) && !isFlat && isForumSite && !isPostDeleted && !isChatPage) {
       moreLinks.push(
         r.a({ className: 'dw-a icon-users s_PA_WkB', onClick: this.onWikifyClick, key: 'wf' },
           isWikiPost(post) ? t.pa.UnWikify : t.pa.Wikify));

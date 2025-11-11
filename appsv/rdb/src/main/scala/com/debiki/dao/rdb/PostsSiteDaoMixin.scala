@@ -48,7 +48,7 @@ trait PostsSiteDaoMixin extends SiteTransaction {
 
   private def select__posts_po__someJoin__patPostRels_pa(someJoin: St): St = s"""
         select po.*,
-               -- Builds an array of arrays:
+               -- Builds an array of arrays:  [array_agg]
                --    [[rel-type, from-pat], [other-rel-type, other-pat], ...]
                array_agg(array[pa.rel_type_c, pa.from_pat_id_c])
                     filter (where pa.rel_type_c is not null)
@@ -649,13 +649,17 @@ trait PostsSiteDaoMixin extends SiteTransaction {
 
   RENAME // to loadEmbeddedCommentsActiveOnly? or add an activeOnly: Bo param
   def loadEmbeddedCommentsApprovedNotDeleted(limit: Int, orderBy: OrderBy): immutable.Seq[Post] = {
+    // Tests:
+    //   - embcom.feeds.2br.ec  TyTEC_FEEDS
     dieIf(orderBy != OrderBy.MostRecentFirst, "TyE60RKTJF4", "Unimpl")
     COULD_OPTIMIZE // It would be better to inner-join posts3 and pages3 first, before
     // left-outer-joining with post_actions3? [posts_join_order]
     val query = s""" -- loadEmbeddedCommentsApprovedNotDeleted
       $select__posts_po__leftJoin__patPostRels_pa
-      inner join pages3 pg using (site_id, page_id)
-      where pg.site_id = ?
+      inner join pages3 pg
+          on   pg.site_id = po.site_id
+          and  pg.page_id = po.page_id
+      where po.site_id = ?
         and pg.page_role = ${PageType.EmbeddedComments.toInt}
         and po.post_nr <> $TitleNr
         and po.post_nr <> $BodyNr
@@ -781,45 +785,6 @@ trait PostsSiteDaoMixin extends SiteTransaction {
       val post = readPost(rs)
       (post.pageId, post)
     })
-  }
-
-
-
-  def loadPostsToReview(): immutable.Seq[Post] = {
-    val flaggedPosts = loadPostsToReviewImpl("""
-      po.deleted_status = 0 and
-      po.num_pending_flags > 0
-      """)
-    val unapprovedPosts = loadPostsToReviewImpl("""
-      po.deleted_status = 0 and
-      po.num_pending_flags = 0 and
-      (po.approved_rev_nr is null or po.approved_rev_nr < po.curr_rev_nr)
-      """)
-    val postsWithSuggestions = loadPostsToReviewImpl("""
-      po.deleted_status = 0 and
-      po.num_pending_flags = 0 and
-      po.approved_rev_nr = curr_rev_nr and
-      po.num_edit_suggestions > 0
-      """)
-    (flaggedPosts ++ unapprovedPosts ++ postsWithSuggestions).to(immutable.Seq)
-  }
-
-
-  private def loadPostsToReviewImpl(whereTests: String): ArrayBuffer[Post] = {
-    val query = s""" -- loadPostsToReviewImpl
-          $select__posts_po__leftJoin__patPostRels_pa
-          where po.site_id = ? and $whereTests
-          $groupBy__siteId_postId
-          """
-    val values = List(siteId.asAnyRef)
-    var results = ArrayBuffer[Post]()
-    runQuery(query, values, rs => {
-      while (rs.next()) {
-        val post = readPost(rs)
-        results += post
-      }
-    })
-    results
   }
 
 

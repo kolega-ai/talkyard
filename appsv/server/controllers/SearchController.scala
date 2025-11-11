@@ -73,6 +73,7 @@ class SearchController @Inject()(cc: ControllerComponents, edContext: TyContext)
       OkSafeJson(Json.obj(
           "thisIsAll" -> JsBoolean(results.pagesAndHits.size < BatchSize),
           "warnings" -> JsArray(searchQuery.warnings.map(JsErrMsgCode)),
+          // Bit dupl code [store_patch_resp]
           "storePatch" -> Json.obj(
             // Later, excl private-visibility tags here. [priv_tags]
             "tagTypes" -> JsTagTypeArray(tagTypes,
@@ -88,7 +89,7 @@ class SearchController @Inject()(cc: ControllerComponents, edContext: TyContext)
             val ancCatsJsonRootFirst: collection.Seq[JsObject] =
                   jsonMaker.makeForumIdAndAncestorsJson(pageMeta)._2
 
-            Json.obj(
+            Json.obj(  // [list_pages_found]
               "pageId" -> pageAndHits.pageId,
               "pageTitle" -> pageAndHits.pageTitle,
               "pageType" -> pageAndHits.pageType.toInt,

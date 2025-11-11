@@ -79,7 +79,7 @@ package object server {
   val CustomAssetsUrlBasePath = "/-/site/"
 
   {
-    val uploadsUrlPath: St = controllers.routes.UploadsController.servePublicFile("").url
+    val uploadsUrlPath: St = talkyard.server.uploads.routes.UploadsController.servePublicFile("").url
     assert(uploadsUrlPath == UploadsUrlBasePath, "TyEBADUPLPATH9564")
   }
 
