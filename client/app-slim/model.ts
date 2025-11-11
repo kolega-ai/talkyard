@@ -2502,6 +2502,9 @@ interface Settings extends TopicInterfaceSettings, SettingsDiscPropsOldNames {
   watchbarStartsOpen: boolean;
   showAuthorHow: ShowAuthorHow;
 
+  // Too complicated, deprecated. Default should be MostlyDisabled.
+  progressLayout: ProgressLayout;
+
   // Topics — hmm these could be per category and topic type too:
   // Inherited from: TopicInterfaceSettings and SettingsDiscPropsOldNames
 

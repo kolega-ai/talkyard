@@ -3277,7 +3277,7 @@ const CustomizeBasicPanel = createFactory({
             help: rFragment({},
               "How shall the Progress section look? One of these numbers:",
               r.br(),
-              "0: Default, currently same as Enabled.",
+              "0: Default, same as Mostly Disabled (2).",
               r.br(),
               "1: Enabled.",
               r.br(),
