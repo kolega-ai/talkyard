@@ -460,13 +460,8 @@ export const Editor = createFactory<any, EditorState>({
     //
     if (!prevState.showMaximized && state.showMaximized && state.visible) {
       this.updatePreviewSoon();
-      // Maybe postpone  talkyard.postElemPostProcessor(..) below until aftewards?
     }
 
-    if (talkyard.postElemPostProcessor &&
-          prevState.safePreviewHtml !== state.safePreviewHtml) {
-      talkyard.postElemPostProcessor('t_E_Preview');
-    }
   },
 
 
@@ -1689,6 +1684,11 @@ export const Editor = createFactory<any, EditorState>({
       scrollToPreview: newScrollToPreview,
     } satisfies Partial<EditorState>, () => {
       if (this.isGone) return;
+
+      if (talkyard.postElemPostProcessor) {
+        talkyard.postElemPostProcessor('t_E_Preview');
+      }
+
       // Show an in-page preview, unless we're creating a new page.  [showPreviewWhere]
       const state: EditorState = this.state;
       if (state.newPageRole || state.newForumTopicCategoryId) {
@@ -2393,6 +2393,10 @@ export const Editor = createFactory<any, EditorState>({
     this.setState({
       splitEditor,
       showMinimized: false,
+    }, () => {
+      if (talkyard.postElemPostProcessor) {
+        talkyard.postElemPostProcessor('t_E_Preview');
+      }
     });
   },
 

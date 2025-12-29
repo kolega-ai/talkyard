@@ -973,6 +973,8 @@ editor -
       edits:
             - embcom.manyframes.drafts-repl-to.2br  TyTEMANYCOMIFR02.TyTEDPREVW
             - TESTS_MISSING scroll to edits preview
+    run plugins eg PrismJS or MathJax:
+            - TESTS_MISSING  TyTCUST_POSTPROC
   upload things:  (7KFC2)
   toolbar buttons:
             - editor-toolbar-preview.1br  TyTEEDTOOLBTNS
@@ -1716,6 +1718,8 @@ draft: [7WKABZP2]
                 mainly in 1st iframe, not 2nd [many_ifr_my_page_data]
     - upload image:
             - TESTS_MISSING
+    run plugins eg PrismJS or MathJax:
+            - TESTS_MISSING  TyTCUST_POSTPROC
     - discussion topic:
     - load from browser storage:
     - go to drafts page w editor open, try open other draft:
@@ -1735,6 +1739,11 @@ draft: [7WKABZP2]
   # PagesDao.createPage
   # PostsDao.insertReply, insertChatMessage, editPostIfAuth
 
+
+plugins,
+prismjs PrismJS,
+mathjax MathJax:
+            - TESTS_MISSING  TyTCUST_POSTPROC
 
 tasks,
 assign posts:
