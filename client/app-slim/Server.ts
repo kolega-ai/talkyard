@@ -2603,14 +2603,20 @@ export function markCurrentPageAsSeen() {
   }
 }
 
-
-export function listWebhooks(onOk: (webhooks: Webhook[]) => Vo) {
-  get('/-/list-webhooks', resp => onOk(resp.webhooks));
+       
+export function listWebhooks(onOk: (resp: ListWebhooksResp) => Vo) {
+  get('/-/list-webhooks', resp => onOk(resp));
 }
 
 
 export function upsertWebhooks(webhooks: Webhook[], onOk: (webhooks: Webhook[]) => Vo) {
   postJsonSuccess('/-/upsert-webhooks', resp => onOk(resp.webhooks), { webhooks });
+}
+
+
+export function alterWebhook(webhookId: WebhookId, mutation,
+        onOk: (resp: ListWebhooksResp) => V) {
+  postJsonSuccess('/-/alter-webhook', onOk, { webhookId, ...mutation });
 }
 
 

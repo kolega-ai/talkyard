@@ -24,6 +24,11 @@ import com.debiki.core.RetryNr.Automatic
 
 
 object Webhook {
+
+  case class WebhookMutation(
+    setPaused: Opt[Bo],
+    skipToNow: Bo)
+
   val NewUnconfigured: Webhook = Webhook(
         id = 1,
         ownerId = Group.AdminsId,

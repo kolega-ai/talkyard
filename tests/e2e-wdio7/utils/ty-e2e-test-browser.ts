@@ -9895,16 +9895,55 @@ export class TyE2eTestBrowser {
           getUrl: async (): Pr<St> => {
             return await this.waitAndGetValue('.c_A_Api_Wh_Url input');
           },
+
           setUrl: async (url: St) => {
             await this.waitAndSetValue('.c_A_Api_Wh_Url input', url);
           },
 
-          setEnabled: async (enabled: Bo) => {
-            await this.setCheckbox('.c_A_Api_Wh_Ena input', enabled);
+          saveWebhook: async () => {
+            await this.waitAndClick('.c_Wh_SavB');
+            await this.waitForDisplayed('.e_Wh_Savd');
           },
 
-          clickSave: async () => {
-            await this.waitAndClick('.e_Wh_SavB');
+          startWebhook: async () => {
+            await this.waitAndClick('.e_Wh_StartB');
+            await this.waitForDisplayed('.c_Wh_Act-Run');
+          },
+
+          startFresh: async () => {
+            await this.waitAndClick('.e_Wh_StartFreshB');
+            await this.waitAndClick('.e_YesFresh');
+            await this.waitUntilModalGone();
+            await this.waitForDisplayed('.c_Wh_Act-Run');
+          },
+
+          skipToNow: async () => {
+            await this.waitAndClick('.e_Skip2NowB');
+            await this.waitAndClick('.e_YesSkip');
+            await this.waitAndClick('.e_Really');
+            await this.waitUntilModalGone();
+            await this.waitForGone('.e_Skip2NowB');
+          },
+
+          pauseWebhook: async () => {
+            await this.waitAndClick('.e_Wh_PauseB');
+            await this.waitForDisplayed('.c_Wh_Act-Pau');
+          },
+
+          isPaused: async (): Pr<Bo> => {
+            return await this.isDisplayed('.c_Wh_Act-Pau');
+          },
+
+          isRunning: async (): Pr<Bo> => {
+            return await this.isDisplayed('.c_Wh_Act-Run');
+          },
+
+          allCaughtUp: async (): Pr<Bo> => {
+            return await this.isDisplayed('.e_Wh_AllDone');
+          },
+
+          lagsAfter: async (): Pr<Bo> => {
+            return await this.isDisplayed('.e_Wh_Lagging');
           },
         },
 

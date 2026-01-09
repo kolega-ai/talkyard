@@ -96,11 +96,12 @@ describe(`webhooks-basic.2br  TyTE2EWBHKBASIC`, () => {
   it(`Owen configures a webhook endpoint`, async () => {
     await owen_brA.adminArea.apiTab.webhooks.setUrl(
           'http://fakeweb:8090/webhooks?siteId=' + site.id);
-    await owen_brA.adminArea.apiTab.webhooks.setEnabled(true);
   });
-
   it(`... saves`, async () => {
-    await owen_brA.adminArea.apiTab.webhooks.clickSave();
+    await owen_brA.adminArea.apiTab.webhooks.saveWebhook();
+  });
+  it(`... starts the webhook`, async () => {
+    await owen_brA.adminArea.apiTab.webhooks.startWebhook();
   });
 
 
