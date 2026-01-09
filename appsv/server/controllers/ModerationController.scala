@@ -30,6 +30,7 @@ import play.api.libs.json._
 import play.api.mvc
 import play.api.mvc.{Action, ControllerComponents}
 import talkyard.server.JsX.{JsEmptyObj, JsPageMetaBrief, JsUser}
+import talkyard.server.authn.MinAuthnStrength
 
 
 /** Lists posts for the moderation page, and approves/rejects/deletes posts
@@ -109,7 +110,9 @@ class ModerationController @Inject()(cc: ControllerComponents, edContext: TyCont
   }
 
 
-  def moderateFromPage: Action[JsValue] = StaffPostJsonAction(maxBytes = 100) { request =>
+  def moderateFromPage: Action[JsValue] = StaffPostJsonAction(
+        MinAuthnStrength.EmbeddingStorageSid12,
+        maxBytes = 100) { request =>
     import request.{dao, body}
     // Tests:
     // - modn-from-disc-page-appr-befr.2browsers.test.ts  TyTE2E603RTJ
