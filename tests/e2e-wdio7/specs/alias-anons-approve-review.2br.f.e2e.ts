@@ -408,7 +408,7 @@ describe(`alias-anons-approve-review.2br.f  TyTALIANONAPRREV`, () => {
   });
   it(`ttt: ... which makes this e2e test pop up an error dialog`, async () => {
     await modya_brB.serverErrorDialog.waitAndAssertTextMatches(
-        /TyEFORBWDS_.+req url: +\/-\/list-complete-users\?.+words: +\["1020304001","owen",.*"memah"/s);
+        /TyEFORBWDS_.+req url: +\/-\/list-users\?.+words: +\["1020304001","owen",.*"memah"/s);
   });
 
 });

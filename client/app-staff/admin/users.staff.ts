@@ -78,7 +78,8 @@ export const UsersTab = createFactory<any>({
 function EnabledUsersPanel(props) {
   return UserList({ whichUsers: 'EnabledUsers',
       intro: r.p({ className: 'e_EnabledUsersIntro' },
-        "Enabled user accounts: (sorted by sign-up date, recent first)") });
+        // &thinsp = 2009.
+        "Enabled user accounts: \u{2009} (sorted by sign-up date, recent first)") });
 }
 
 function WaitingUsersPanel(props) {
@@ -232,27 +233,51 @@ const InvitedUsersPanel = createFactory<any>({
 });
 
 
+
 interface UserListState {
+  // Right now, [badges_not_shown_in_user_lists].
   users?: UserInclDetailsWithStats[]
-  usernameFilter?: St
-  emailAdrFilter?: St
+  filters: PeopleFilter
+  maybeMore?: Bo
+  thereAreExtIds?: Bo
+  // Odd (1,2,3,...) = loading more, even = done. Nice for e2e tests. Oh, not using, oh well.
+  loadingStatus?: Nr
+
+  showFilters?: Bo
+  showExtIds?: Bo
+  autoSearch?: Bo
 }
+
 
 const UserList = createFactory<any>({
   displayName: 'UserList',
 
   getInitialState: function() {
-    return {};
+    return { filters: {}, loadingStatus: 0, autoSearch: true };
   },
 
   componentDidMount: function() {
+    this.loadUsersSoon = _.debounce(this.loadUsers, 900);  // cmp w editor: [upd_ed_pv_delay]
     this.loadUsers();
   },
 
-  componentDidUpdate: function(prevProps) {
+  componentDidUpdate: function(prevProps, prevState) {
+    const state: UserListState = this.state;
+    const filters: PeopleFilter = state.filters;
+    const prevFilters: PeopleFilter = prevState.filters;
+    let reload = false;
     if (prevProps.whichUsers !== this.props.whichUsers) {
+      // COULD_OPTIMIZE: If has loaded exactly all users, sort & filter users here in the
+      // browser instead of server side. [_sort_filter_in_mem]
       this.setState({ users: null });
-      this.loadUsers();
+      reload = true;
+    }
+    else if (state.autoSearch && !obj_isDeepEqIgnUndef(prevFilters, filters)) {
+      // COULD_OPTIMIZE: If has loaded all w/o any filter, then, [_sort_filter_in_mem].
+      reload = true;
+    }
+    if (reload) {
+      this.loadUsersSoon();
     }
   },
 
@@ -261,11 +286,51 @@ const UserList = createFactory<any>({
     this.isGone = true;
   },
 
-  loadUsers: function(prevProps) {
-    // Right now, [badges_not_shown_in_user_lists].
-    Server.listCompleteUsers(this.props.whichUsers, users => {
+  loadMore: function() {
+    const state: UserListState = this.state;
+    const users = state.users;
+    const offset = findOffset(users);
+    this.loadUsers(offset);
+
+    function findOffset(users?: UserInclDetailsWithStats[]): PeopleOffset | N {
+      if (!users) return null;
+      const last = users[users.length - 1];
+      return { createdAtMsLte: last.createdAtEpoch, idLt: last.id };
+    }
+  },
+
+  loadUsers: function(anyOffset: PeopleOffset | N) {
+    const stateBef: UserListState = this.state;
+    this.setState({ loadingStatus: stateBef.loadingStatus + 1 });  // odd = is loading
+
+    Server.listUsers(this.props.whichUsers, stateBef.filters, anyOffset,
+            (resp: ListUsersResponse) => {
       if (this.isGone) return;
-      this.setState({ users });
+      let users = resp.users;
+
+      const stateAft: UserListState = this.state;
+
+      // Should we add a column for external ids?
+      let thereAreExtIds = stateAft.thereAreExtIds;
+      if (!thereAreExtIds) {
+        for (let u of users) {
+          if (u.externalId || u.ssoId) {
+            thereAreExtIds = true;
+            break;
+          }
+        }
+      }
+
+      if (anyOffset) {
+        users = [...stateBef.users, ...users];
+      }
+
+      this.setState({
+        users,
+        maybeMore: resp.maybeMore,
+        thereAreExtIds,
+        loadingStatus: stateAft.loadingStatus + 1,  // even = done
+      } satisfies Partial<UserListState>);
     });
   },
 
@@ -274,21 +339,36 @@ const UserList = createFactory<any>({
     if (!state.users)
       return r.p({}, "Loading...");
 
-    // UX COULD_OPTIMIZE: Load at most 500 users, if more, only those matching the filter?
-    // UX Fuzzy search for username? But should a fuzzy username index be in Postgres
-    // or ElasticSearch?
+    const filters: PeopleFilter = state.filters;
+    const updateFilter = (fs: PeopleFilter) => {
+      this.setState({ filters: { ...filters, ...fs }});
+    }
+
     const allUsers: UserInclDetailsWithStats[] = state.users;
     let users = allUsers;
+
+    /* Here's how I used to filter users in-memory instead of server side. Could start doing
+    // again later, if all users have been loaded from the server already. [_sort_filter_in_mem]
     users = !state.usernameFilter ? users :
             _.filter(users, (u: UserInclDetailsWithStats) =>
                                   u.username.indexOf(state.usernameFilter) >= 0);
     users = !state.emailAdrFilter ? users :
             _.filter(users, (u: UserInclDetailsWithStats) =>
-                                  u.email.indexOf(state.emailAdrFilter) >= 0);
+                                  u.email.indexOf(state.emailAdrFilter) >= 0);  */
+
+    // UX COULD: Hide all ext id stuff, if we're sure there are no ext ids?
+    // But only if we didn't use any filters when `!maybeMore`. Let's wait.
+    // const noExtIds = !state.thereAreExtIds && !state.maybeMore;
 
     const now = new Date().getTime();
     let userRows = users.map((user: UserInclDetailsWithStats) => {
-      return UserRow({ user: user, now: now, key: user.id, whichUsers: this.props.whichUsers });
+      return UserRow({
+        user,
+        now,
+        key: user.id,
+        whichUsers: this.props.whichUsers,
+        showExtIds: state.showExtIds,
+      });
     });
 
     if (!users.length)
@@ -298,20 +378,61 @@ const UserList = createFactory<any>({
         ? r.th({}, "Actions")
         : null;
 
+    // Odd = is loading
+    const hasLoadedMore = state.loadingStatus >= 2;
+    const isLoadingMoreNow = state.loadingStatus % 2;
+
     return (r.div({},
       r.div({ className: 'esAdminSectionIntro' }, this.props.intro),
-      r.div({ className: 'c_A_Fils' },
+
+      r.div({ className: 'c_A_Us_ShowWhat' },
+          Input({ type: 'checkbox', className: 'e_ShowFil',
+              label: "Show filters",
+              checked: !!state.showFilters,
+              onChange: (event: RInpEvt) =>
+                  this.setState({ showFilters: event.target.checked }) }),
+          //noExtIds ? null :  — later
+          Input({ type: 'checkbox', className: 'e_ShowExtIds',
+              label: "Show external IDs",
+              checked: !!state.showExtIds,
+              onChange: (event: RInpEvt) =>
+                  this.setState({ showExtIds: event.target.checked }) }),
+          !state.showFilters ? null : Input({ type: 'checkbox', className: 'e_AutoSch',
+              label: "Auto search",
+              checked: !!state.autoSearch,
+              onChange: (event: RInpEvt) =>
+                  this.setState({ autoSearch: event.target.checked }) }),
+      ),
+
+      !state.showFilters ? null : r.div({ className: 'c_A_Us_Fils' },
         // Break out [query_field_and_q_param]?
         Input({ type: 'text', className: 'e_UnFil',
             label: "Username filter",
-            value: state.usernameFilter,
+            value: filters.username,
             onChange: (event: RInpEvt) =>
-                this.setState({ usernameFilter: event.target.value }) }),
+                updateFilter({ username: event.target.value }) }),
         Input({ type: 'text', className: 'e_EmFil',
-            label: "Email filter",
-            value: state.emailAdrFilter,
+            label: "Email",
+            value: filters.emailAddr,
             onChange: (event: RInpEvt) =>
-                this.setState({ emailAdrFilter: event.target.value }) }),
+                updateFilter({ emailAddr: event.target.value }) }),
+        Input({ type: 'text', className: 'e_NameFil',
+            label: "Full name",
+            value: filters.fullName,
+            onChange: (event: RInpEvt) =>
+                updateFilter({ fullName: event.target.value }) }),
+
+        !state.showExtIds ? null :
+            //noExtIds
+            //  ? r.span({ className: 'e_Are0ExtIds' }, "There are no external IDs.")
+            Input({ type: 'text', className: 'e_ExtIdFil',
+                    label: "External ID",
+                    value: filters.extId,
+                    onChange: (event: RInpEvt) =>
+                        updateFilter({ extId: event.target.value }) }),
+        state.autoSearch ? null : r.div({ className: 'form-group c_A_U_Fils_Sch' },
+            PrimaryButton({ onClick: () => { this.loadUsers() }, className: 'c_A_U_Fils_Sch_B' },
+              "Search")),
         ),
       r.div({ className: 'dw-users-to-review e_AdminUsersList' },
         r.table({ className: 'table' },
@@ -327,12 +448,44 @@ const UserList = createFactory<any>({
               r.th({}, "Num posts"),
               //r.th({}, "Country"),
               //r.th({}, "URL"),
-              r.th({}, "Created"))),
+              r.th({}, "Created"),
+              !state.showExtIds ? null :
+                  r.th({}, "Extternal IDs"),
+              )),
           r.tbody({},
-            userRows)))));
+            userRows)),
+
+        // ----- Load More button and status
+
+        !state.maybeMore || isLoadingMoreNow ? null :
+            Button({ className: 'e_MoreB', onClick: () => {
+              this.loadMore();
+            }}, "Load more ..."),
+        !isLoadingMoreNow ? null :
+            r.p({ className: 'e_LoadingMore' }, "Loading ..."),
+        isLoadingMoreNow || !hasLoadedMore ? null :
+            r.p({ className: 'e_LoadedMore' }, // let's skip: e_LoadedMore-' + state.loadingStatus
+              state.maybeMore ? null
+                              : r.span({ className: 'e_0More' },
+                                  "That's all" + (_.isEmpty(state.filters) ? '.' :
+                                                    " matching the current filters.")))
+        )));
   }
 });
 
+
+interface UserRowState {
+  wasJustApproved?: Bo
+  wasJustRejected?: Bo
+
+}
+
+interface UserRowProps {
+  whichUsers: St
+  user: UserInclDetailsWithStats
+  showExtIds?: Bo
+  now: WhenMs
+}
 
 const UserRow = createFactory<any>({
   displayName: 'UserRow',
@@ -363,16 +516,18 @@ const UserRow = createFactory<any>({
   },
 
   render: function() {
-    const user: UserInclDetailsWithStats = this.props.user;
-    const nowMs: WhenMs = this.props.now;
+    const state: UserRowState = this.state;
+    const props: UserRowProps = this.props;
+    const user: UserInclDetailsWithStats = props.user;
+    const nowMs: WhenMs = props.now;
 
     let actions: RElm | U;
-    if (this.props.whichUsers !== 'WaitingUsers') {
+    if (props.whichUsers !== 'WaitingUsers') {
       // Don't show any actions.
     }
-    else if (this.state.wasJustApproved || this.state.wasJustRejected) {
+    else if (state.wasJustApproved || state.wasJustRejected) {
       actions = rFr({},
-        this.state.wasJustApproved ? "Approved. " : "Rejected. ",
+        state.wasJustApproved ? "Approved. " : "Rejected. ",
         Button({ onClick: this.undoApproveOrReject, className: 'e_UndoApprRjctB' }, "Undo"));
     }
     else {
@@ -446,7 +601,15 @@ const UserRow = createFactory<any>({
         r.td({}, numPosts),
         //r.td({}, user.country), — usually empty, or inconsistent
         //r.td({}, user.url),
-        r.td({}, createdAt)));
+        r.td({}, createdAt),
+        !props.showExtIds ? null :
+            r.td({},
+              !user.ssoId && !user.externalId ? null :
+                  r.pre({ className: 'c_ExtIds' },
+                      user.ssoId === user.externalId
+                          ? user.ssoId
+                          : user.ssoId + '\n' + user.externalId)),
+        ));
   }
 });
 

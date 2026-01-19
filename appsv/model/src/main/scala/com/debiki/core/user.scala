@@ -2679,13 +2679,24 @@ case class PeopleQuery(  // also see PageQuery
   orderOffset: PeopleOrderOffset,
   peopleFilter: PeopleFilter)
 
+
 /** How to sort users and groups, when loading from the database, and any pagination offset.
   */
 sealed abstract class PeopleOrderOffset
+
 object PeopleOrderOffset {
-  case object BySignedUpAtDesc extends PeopleOrderOffset
-  case object ByUsername extends PeopleOrderOffset
+  case class BySignedUpAtDesc(createdAtMsLte: Opt[When], idLt: Opt[PatId])(mab: MessAborter)
+      extends PeopleOrderOffset {
+    // It's ok to specify a date but no id, but not the other way around, because ids
+    // might not follow sign up date order (maybe imported from elsewhere f.ex.).
+    // (Both date and id needed if paginating, since multiple users might have the
+    // same createdAt date.)
+    mab.abortIf(idLt.isDefined && createdAtMsLte.isEmpty,
+          "TyEZKJ3BG54", "Can't specify only max id, but no max date")
+  }
+  //case object ByUsername extends PeopleOrderOffset
 }
+
 
 case class PeopleFilter(
   onlyWithVerifiedEmail: Boolean = false,
@@ -2694,7 +2705,18 @@ case class PeopleFilter(
   onlyStaff: Boolean = false,
   onlySuspended: Boolean = false,
   //onlySilenced: Boolean = false,
-  onlyThreats: Boolean = false) {
+  onlyThreats: Boolean = false,
+  username: Opt[St] = None,
+  fullName: Opt[St] = None,
+  emailAddr: Opt[St] = None,
+  // IP addr search not implemented. Would it mean the last seen addr, or any recent addr?
+  // or any seen addr? or the sign-up adddr? Or any combination of this? — Maybe better
+  // use ElasticSearch for ip addr search? [find_user_by_ip]
+  ipAddr: Opt[St] = None,
+  extId: Opt[St] = None,
+  // Good enough for now, but not yet implemented. [0_exact_ppl_search]
+  exact: Bo = false,
+  ) {
   forbid(onlyApproved && onlyPendingApproval, "TyEZKJ3BG59")
 }
 

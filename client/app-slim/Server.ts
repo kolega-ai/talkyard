@@ -1472,10 +1472,22 @@ export function loadPatVvbPatchStore(userIdOrUsername: UserId | St,
 }
 
 
-export function listCompleteUsers(whichUsers, success: (users: UserInclDetailsWithStats[]) => void) {
-  get(`/-/list-complete-users?whichUsers=${whichUsers}`, response => {
-    success(response.users);
-  });
+export function listUsers(whichUsers: St, filters: PeopleFilter, offset: PeopleOffset | NU,
+        onOk: (_: ListUsersResponse) => V) {
+  let params = new URLSearchParams();
+  params.set('whichUsers', whichUsers);
+  if (filters.username) params.set('username', filters.username);
+  if (filters.fullName) params.set('fullName', filters.fullName);
+  if (filters.emailAddr) params.set('emailAddr', filters.emailAddr);
+  if (filters.ipAddr) params.set('ipAddr', filters.ipAddr);
+  if (filters.extId) params.set('extId', filters.extId);
+  if (offset) {
+    params.set('createdAtMsLte', offset.createdAtMsLte + '');
+    if (offset.idLt) {
+      params.set('idLt', offset.idLt + '');
+    }
+  }
+  get(`/-/list-users?` + params.toString(), onOk);
 }
 
 

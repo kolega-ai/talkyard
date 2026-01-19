@@ -936,6 +936,14 @@ See GitHub, they have [author:___ labels:____] fields on each page, e.g. Issues,
 Pull Requests, Discussions. And an url query param, e.g.
     https://github.com/launchbadge/sqlx/pulls?q=is%3Apr+label%3Abreaking
 
+[fuzzy_user_search]
+Fuzzy search, trigram, postfix search using ElasticSearch, or Postgres + GIN indexes?
+Maybe ElasticSearch = better, because then can search for both user labels and parts
+of a username at the same time. So would work better if there's many users.
+Or maybe the user list pages could use Pg + GIN, the dedicated search page could use ES?
+[0_exact_ppl_search]
+[find_user_by_ip]
+[search_all_email_adrs] — find users by secondary email addrs too, not only primary.
 
 [lazy-upd-link-origins]
 If moves CDN to a different address, or moves Talkyard server to a new address,
