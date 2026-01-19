@@ -425,7 +425,7 @@ function runAllE2eTests {
 
   $r s/wdio --only group-profile-change-things.2browsers $args
 
-  $r s/wdio --only many-users-mention-list-join-group.2browsers $args
+  $r s/wdio-7 --only many-users-mention-list-join-group.2br --cd -i $args
   #$r s/wdio --only many-users-large-group.2browsers $args
   #$r s/wdio --only many-groups.2browsers $args
   #$r s/wdio --only many-users-many-large-groups.2browsers $args
