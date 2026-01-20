@@ -93,6 +93,7 @@ interface WaitPs {   // ps = params
   refreshBetween?: Bo;
   tryMaxTimes?: Nr
   timeoutMs?: Nr;
+  allElemPromisesTimeoutMs?: Nr
   timeoutIsFine?: Bo;
   serverErrorDialogIsFine?: Bo;
   winClosedIsFine?: Bo;
@@ -2721,9 +2722,9 @@ export class TyE2eTestBrowser {
     }
 
 
-    async waitAndGetListTexts(selector: St): Pr<St[]> {
+    async waitAndGetListTexts(selector: St, ps: { allElemPromisesTimeoutMs?: Nr } = {}): Pr<St[]> {
       return await this.__waitAndGetThingsInList(
-            selector, {}, async (e) => await e.getText());
+            selector, ps, async (e) => await e.getText());
     }
 
 
@@ -2751,15 +2752,16 @@ export class TyE2eTestBrowser {
         // Webdriverio v7 keeps retrying automatically, it seems: it can start logging
         //   "Request encountered a stale element - terminating request"
         // forever until timeout after 30s. Let's retry sooner:
+        const promisesTimeoutMs = ps.allElemPromisesTimeoutMs || 3000;
         const tooSlowPromise = new Promise(resolve => {
-          setTimeout(resolve, 3000, 'TOO_SLOW');
+          setTimeout(resolve, promisesTimeoutMs, 'TOO_SLOW');
         });
         const itemsOrTimeout =
                 await Promise.race([Promise.all(promises), tooSlowPromise]);
 
         if (itemsOrTimeout === 'TOO_SLOW') {
-          logMessage(`Promises.all(...) is taking too long. ${promises.length
-                } \`fn(e: WElm)\` promises. Aborting. [TyM4GMW20K]`);
+          logMessage(`Promises.all(...) is taking too long, > ${promisesTimeoutMs} ms. (There're ${
+                promises.length} \`fn(e: WElm)\` promises.) Aborting. [TyM4GMW20K]`);
           return false;
         }
 
@@ -5829,6 +5831,17 @@ export class TyE2eTestBrowser {
         await (await this.$(this.addUsersToPageDialog.__inputSel)).addValue(chars);
       },
 
+      waitUntilMatchingUsersListed: async () => {
+        let num = 0;
+        await this.waitUntil(async () => {
+          const text = await this.waitAndGetVisibleText('.Select-option');
+          num = text.length;
+          return num >= 0;
+        }, {
+          message: () => `Waiting for add-user dropdown options, currently: ${0}`
+        })
+      },
+
       hitEnterToSelectUser: async () => {
         // Dupl code. [.react_select]
         // Might not work in Firefox. Didn't in wdio v4.
@@ -5849,6 +5862,7 @@ export class TyE2eTestBrowser {
             // username + '\n');
             username);
 
+        await this.addUsersToPageDialog.waitUntilMatchingUsersListed();
         await this.addUsersToPageDialog.hitEnterToSelectUser();
 
 
@@ -9727,9 +9741,40 @@ export class TyE2eTestBrowser {
           }
         },
 
+        setShowFilters: async (show: Bo) => {
+          await this.setCheckbox('.e_ShowFil input', show);
+        },
+
+        setUsernameFilter: async (text: St) => {
+          await this.waitAndSetValue('.s_A_Us .e_UnFil input', text);
+        },
+
+        setEmailFilter: async (text: St) => {
+          await this.waitAndSetValue('.s_A_Us .e_EmFil input', text);
+        },
+
+        setFullNameFilter: async (text: St) => {
+          await this.waitAndSetValue('.s_A_Us .e_NameFil input', text);
+        },
 
         waitForLoaded: async () => {
           await this.waitForVisible('.e_AdminUsersList');
+        },
+
+        canLoadMore: async (): Pr<Bo> => {
+          return await this.isVisible('.s_A_Us .e_MoreB');
+        },
+
+        hasLoadedAll: async (): Pr<Bo> => {
+          return await this.isVisible('.s_A_Us .e_0More');
+        },
+
+        loadMoreUsers: async (ps: { waitForNum?: Nr, waitForAll?: Bo }) => {
+          await this.waitAndClick('.s_A_Us .e_MoreB');
+          await this.waitForExist('.s_A_Us .e_LoadedMore');
+          if (ps.waitForNum || ps.waitForAll) {
+            await this.adminArea.users.waitForNumUsers(ps);
+          }
         },
 
         goToUser: async (user: St | Member) => {
@@ -9752,8 +9797,10 @@ export class TyE2eTestBrowser {
 
         assertUsenamesAreAndOrder: async (usernames: St[]) => {
           await this.adminArea.users.waitForLoaded();
+          // 3 seconds actually isn't enough, sometimes, on my Core i5 laptop. But 6 works fine.
+          const ps = usernames.length > 100 ? { allElemPromisesTimeoutMs: 6000 } : {};
           const actualUsernames = await this.waitAndGetListTexts(
-                  this.adminArea.users.usernameSelector);
+                  this.adminArea.users.usernameSelector, ps);
           tyAssert.deepEq(usernames, actualUsernames);
         },
 
@@ -9765,6 +9812,22 @@ export class TyE2eTestBrowser {
         asserExactlyNumUsers: async (num: Nr) => {
           await this.adminArea.users.waitForLoaded();
           await this.assertExactly(num, this.adminArea.users.usernameSelector);
+        },
+
+        waitForNumUsers: async (ps: Nr | { waitForNum?: Nr, waitForAll?: Bo }) => {
+          let actual: St | Nr = '?'
+          const ps2 = _.isNumber(ps) ? { waitForNum: ps } : ps;
+          // Wait for nothing?
+          dieIf(_.isUndefined(ps2.waitForNum) && _.isUndefined(ps2.waitForAll), 'TyE7FN2RJ5');
+          await this.waitUntil(async () => {
+            const numOk = _.isUndefined(ps2.waitForNum) ||
+                    ps2.waitForNum === (await this.count(this.adminArea.users.usernameSelector));
+            const waitAllOk = !ps2.waitForAll ? true :
+                                await this.adminArea.users.hasLoadedAll();
+            return numOk && waitAllOk;
+          }, {
+            message: () => `Waiting for ${j2s(ps2)} users, now: ${actual}`,
+          });
         },
 
         // Works only if exactly 1 user listed.

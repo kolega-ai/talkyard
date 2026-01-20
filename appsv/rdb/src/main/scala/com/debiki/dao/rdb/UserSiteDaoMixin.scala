@@ -1034,7 +1034,8 @@ trait UserSiteDaoMixin extends SiteTransaction {  // RENAME; QUICK // to UserSit
     val filter = peopleQuery.peopleFilter
     val values = ArrayBuffer(siteId.asAnyRef)
 
-    TESTS_MISSING // so many possible combinations
+    // Tests:
+    //  - many-users-mention-list-join-group.2browsers.test.ts  TyT0326SKDGW2.TyTSTAUSRLSFIL
 
     // These `like "%...%"` clauses are inefficient.  But previously we were doing
     // a full per-site table scan and trying to send *everything* back to the browser.

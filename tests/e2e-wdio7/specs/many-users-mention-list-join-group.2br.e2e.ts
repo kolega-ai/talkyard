@@ -26,7 +26,7 @@ const GroupsFirstUsername = 'groups_1st_username';
 const GroupsFirstNames = { username: GroupsFirstUsername, fullName: GroupsFirstFullName };
 
 
-describe("many-users-mention-list-join-group  TyT0326SKDGW2", () => {
+describe("many-users-mention-list-join-group.2br  TyT0326SKDGW2", () => {
 
   it("import a site", async () => {
     const builder = buildSite();
@@ -124,6 +124,7 @@ describe("many-users-mention-list-join-group  TyT0326SKDGW2", () => {
 
   it("... adds 'Minion Mia77'", async () => {
     await owensBrowser.addUsersToPageDialog.appendChars("7");
+    await owensBrowser.addUsersToPageDialog.waitUntilMatchingUsersListed();
     await owensBrowser.addUsersToPageDialog.hitEnterToSelectUser();
   });
 
@@ -142,7 +143,13 @@ describe("many-users-mention-list-join-group  TyT0326SKDGW2", () => {
   });
 
   it("There are now 5 people in the group", async () => {
-    assert.eq(await owensBrowser.userProfilePage.groupMembers.getNumMembers(), 5);
+    await owensBrowser.waitUntil(async () => {
+      const num = await owensBrowser.userProfilePage.groupMembers.getNumMembers();
+      return num == 5;
+    }, {
+      message: `Waiting for 5 members`,
+      refreshBetween: true,
+    });
   });
 
   it("... namely Maria, Michael and the minions", async () => {
@@ -158,12 +165,166 @@ describe("many-users-mention-list-join-group  TyT0326SKDGW2", () => {
   // ----- Admin Area: Listing many users
 
 
+  let expectedUsernames: St[];
+
   it("Owen goes to the admin area, the users list", async () => {
     await owensBrowser.adminArea.goToUsersEnabled();
   });
 
-  it("Oh so many. Owen types ... Maria, Michael, Zelda? Where?", async () => {
-    // TESTS_MISSING  TyT60295KTDT
+  it("... Owen sees Zelda, and Minion_Mina 150...102, that's 50 in total [limit_50]", async () => {
+    expectedUsernames = ['minion_zelda'];
+    for (let nr = 150; nr >= 102; nr--) {
+      expectedUsernames.push(`Minion_Mina${nr}`)
+    }
+    await owensBrowser.adminArea.users.waitForNumUsers(50);
+    await owensBrowser.adminArea.users.assertUsenamesAreAndOrder(expectedUsernames);
+  });
+
+  it("... Owen loads more users: Minion_Mina 101...52", async () => {
+    for (let nr = 101; nr >= 52; nr--) {
+      expectedUsernames.push(`Minion_Mina${nr}`)
+    }
+    await owensBrowser.adminArea.users.loadMoreUsers({ waitForNum: 50 * 2 });
+    await owensBrowser.adminArea.users.assertUsenamesAreAndOrder(expectedUsernames);
+  });
+
+  it("... Owen loads more users: Minion_Mina 51...2", async () => {
+    for (let nr = 51; nr >= 2; nr--) {
+      expectedUsernames.push(`Minion_Mina${nr}`)
+    }
+    await owensBrowser.adminArea.users.loadMoreUsers({ waitForNum: 50 * 3 });
+    await owensBrowser.adminArea.users.assertUsenamesAreAndOrder(expectedUsernames);
+  });
+
+  it(`... Owen loads Minion_Mina 1,  and minion_mia 100..52
+                                      (note: lowercase, and 'mia' not 'mina')`, async () => {
+    expectedUsernames.push(`Minion_Mina1`)
+    for (let nr = 100; nr >= 52; nr--) {
+      expectedUsernames.push(`minion_mia${nr}`)  // Mia not Mina
+    }
+    await owensBrowser.adminArea.users.loadMoreUsers({ waitForNum: 50 * 4 });
+    await owensBrowser.adminArea.users.assertUsenamesAreAndOrder(expectedUsernames);
+  });
+
+  it(`... Owen loads minion_mia 51...2`, async () => {
+    for (let nr = 51; nr >= 2; nr--) {
+      expectedUsernames.push(`minion_mia${nr}`)
+    }
+    await owensBrowser.adminArea.users.loadMoreUsers({ waitForNum: 50 * 5 });
+    await owensBrowser.adminArea.users.assertUsenamesAreAndOrder(expectedUsernames);
+  });
+
+  it(`... Owen loads minion_mia 1, plus the usual suspects — 260 in total  TyT60295KTDT`, async () => {
+    expectedUsernames.push(`minion_mia1`)
+    expectedUsernames.push('mallory');
+    expectedUsernames.push('michael');
+    expectedUsernames.push('maria');
+    expectedUsernames.push('memah');
+    expectedUsernames.push('regina');
+    expectedUsernames.push('Corax');
+    expectedUsernames.push('mod_modya');
+    expectedUsernames.push('mod_mons');
+    expectedUsernames.push('owen_owner');
+    await owensBrowser.adminArea.users.loadMoreUsers({ waitForNum: 50 * 5 + 10 });
+    await owensBrowser.adminArea.users.assertUsenamesAreAndOrder(expectedUsernames);
+  });
+
+  it(`... that's all, Load-more button gone`, async () => {
+    assert.that(await owensBrowser.adminArea.users.hasLoadedAll());
+    assert.not(await owensBrowser.adminArea.users.canLoadMore());
+  });
+
+
+  // ----- Staff user list filters   TyTSTAUSRLSFIL
+
+  // Username filter
+
+  it(`Owen toggles filters on`, async () => {
+    await owensBrowser.adminArea.users.setShowFilters(true);
+  });
+
+  it(`... types 'Mina' as username filter`, async () => {
+    await owensBrowser.adminArea.users.setUsernameFilter("Mina");
+  });
+
+  it(`... sees the last 50 Minion_Mina only`, async () => {
+    expectedUsernames = [];
+    for (let nr = 150; nr >= 101; nr--) {
+      expectedUsernames.push(`Minion_Mina${nr}`)
+    }
+    await owensBrowser.adminArea.users.waitForNumUsers(50);
+    await owensBrowser.adminArea.users.assertUsenamesAreAndOrder(expectedUsernames);
+  });
+
+  it(`... Owen loads 50 more users, sees Mina 100...51`, async () => {
+    for (let nr = 100; nr >= 51; nr--) {
+      expectedUsernames.push(`Minion_Mina${nr}`)
+    }
+    await owensBrowser.adminArea.users.loadMoreUsers({ waitForNum: 50 * 2 });
+    await owensBrowser.adminArea.users.assertUsenamesAreAndOrder(expectedUsernames);
+  });
+
+  it(`... Owen loads 50 more users, sees Mina 50...1`, async () => {
+    for (let nr = 50; nr >= 1; nr--) {
+      expectedUsernames.push(`Minion_Mina${nr}`)
+    }
+    await owensBrowser.adminArea.users.loadMoreUsers({ waitForNum: 50 * 3 });
+    await owensBrowser.adminArea.users.assertUsenamesAreAndOrder(expectedUsernames);
+  });
+
+  it(`... Owen tries to load 50 more users, but there are no more`, async () => {
+    await owensBrowser.adminArea.users.loadMoreUsers({ waitForNum: 50 * 3, waitForAll: true });
+    await owensBrowser.adminArea.users.assertUsenamesAreAndOrder(expectedUsernames); // unchanged
+  });
+
+
+  // Email filter
+
+  it(`Owen types '5' as email filter`, async () => {
+    await owensBrowser.adminArea.users.setEmailFilter("5");
+  });
+
+  it(`... sees Minion_Mina 150, 145, 135, ... 55, 50, 45, ... 15, 5 only`, async () => {
+    expectedUsernames = [];
+    expectedUsernames.push(`Minion_Mina150`);    // 1 +
+    for (let nr = 145; nr >= 65; nr -= 10) {     // 9 +
+      expectedUsernames.push(`Minion_Mina${nr}`)
+    }
+    for (let nr = 59; nr >= 50; nr -= 1) {       // 10 +
+      expectedUsernames.push(`Minion_Mina${nr}`)
+    }
+    expectedUsernames.push(`Minion_Mina45`);     // 5  =  25
+    expectedUsernames.push(`Minion_Mina35`);
+    expectedUsernames.push(`Minion_Mina25`);
+    expectedUsernames.push(`Minion_Mina15`);
+    expectedUsernames.push(`Minion_Mina5`);
+    await owensBrowser.adminArea.users.waitForNumUsers({ waitForNum: 25, waitForAll: true });
+    await owensBrowser.adminArea.users.assertUsenamesAreAndOrder(expectedUsernames);
+  });
+
+  it(`... there's no Load More button`, async () => {
+    assert.that(await owensBrowser.adminArea.users.hasLoadedAll());
+    assert.not(await owensBrowser.adminArea.users.canLoadMore());
+  });
+
+  // Name filter
+
+  it(`Owen types '0' as name filter`, async () => {
+    await owensBrowser.adminArea.users.setFullNameFilter("0");
+  });
+
+  it(`... sees Minion_Mina 150, 105 and 50 only. Will he give them a secret mission?`, async () => {
+    expectedUsernames = [];
+    expectedUsernames.push(`Minion_Mina150`);
+    expectedUsernames.push(`Minion_Mina105`);
+    expectedUsernames.push(`Minion_Mina50`);
+    await owensBrowser.adminArea.users.waitForNumUsers({ waitForNum: 3, waitForAll: true });
+    await owensBrowser.adminArea.users.assertUsenamesAreAndOrder(expectedUsernames);
+  });
+
+  it(`... no Load More button`, async () => {
+    assert.that(await owensBrowser.adminArea.users.hasLoadedAll());
+    assert.not(await owensBrowser.adminArea.users.canLoadMore());
   });
 
 

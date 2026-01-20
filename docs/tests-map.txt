@@ -1456,8 +1456,10 @@ admin:
   cannot bad-click break an admin, e.g. unverifying hens email or unapproving, rejecting:
           - (missing) [5AEWBN0]
   members tab:
+    filter by username, email etc:
+            - many-users-mention-list-join-group.2browsers.test.ts  TyT0326SKDGW2.TyTSTAUSRLSFIL
     really many members:
-            - many-users-mention-list-join-group.2browsers.test.ts   TESTS_MISSING  TyT60295KTDT
+            - many-users-mention-list-join-group.2browsers.test.ts  TyT0326SKDGW2.TyT60295KTDT
     suspended users:
             - modn-ban-from-disc-page.2br.f  TyTEBANFROMDISC.TyTMODN_SUSPLS
   terminate someone else's sessions:
