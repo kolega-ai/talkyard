@@ -10851,11 +10851,15 @@ export class TyE2eTestBrowser {
 
       loginIfNeededViaMetabar: async (ps: NameAndPassword, clickPs?: WaitAndClickPs) => {
         await this.switchToEmbCommentsIframeIfNeeded();
+        const isWhereBef = this.#isWhere;
         await this.waitForMyDataAdded();
         if (!await this.metabar.isLoggedIn()) {
           logMessage(`Need to log in, as @${ps.username
                 } — session id cookie blocked? [TyM306MRKTJ]`);
           await this.complex.loginWithPasswordViaMetabar(ps, clickPs);
+        }
+        if (isWhereBef === IsWhere.EmbCommentsIframe) {
+          await this.switchToEmbeddedCommentsIrame();
         }
       },
 
