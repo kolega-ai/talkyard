@@ -93,6 +93,7 @@ interface WaitPs {   // ps = params
   refreshBetween?: Bo;
   tryMaxTimes?: Nr
   timeoutMs?: Nr;
+  allElemPromisesTimeoutMs?: Nr
   timeoutIsFine?: Bo;
   serverErrorDialogIsFine?: Bo;
   winClosedIsFine?: Bo;
@@ -2721,9 +2722,9 @@ export class TyE2eTestBrowser {
     }
 
 
-    async waitAndGetListTexts(selector: St): Pr<St[]> {
+    async waitAndGetListTexts(selector: St, ps: { allElemPromisesTimeoutMs?: Nr } = {}): Pr<St[]> {
       return await this.__waitAndGetThingsInList(
-            selector, {}, async (e) => await e.getText());
+            selector, ps, async (e) => await e.getText());
     }
 
 
@@ -2751,15 +2752,16 @@ export class TyE2eTestBrowser {
         // Webdriverio v7 keeps retrying automatically, it seems: it can start logging
         //   "Request encountered a stale element - terminating request"
         // forever until timeout after 30s. Let's retry sooner:
+        const promisesTimeoutMs = ps.allElemPromisesTimeoutMs || 3000;
         const tooSlowPromise = new Promise(resolve => {
-          setTimeout(resolve, 3000, 'TOO_SLOW');
+          setTimeout(resolve, promisesTimeoutMs, 'TOO_SLOW');
         });
         const itemsOrTimeout =
                 await Promise.race([Promise.all(promises), tooSlowPromise]);
 
         if (itemsOrTimeout === 'TOO_SLOW') {
-          logMessage(`Promises.all(...) is taking too long. ${promises.length
-                } \`fn(e: WElm)\` promises. Aborting. [TyM4GMW20K]`);
+          logMessage(`Promises.all(...) is taking too long, > ${promisesTimeoutMs} ms. (There're ${
+                promises.length} \`fn(e: WElm)\` promises.) Aborting. [TyM4GMW20K]`);
           return false;
         }
 
@@ -5829,6 +5831,17 @@ export class TyE2eTestBrowser {
         await (await this.$(this.addUsersToPageDialog.__inputSel)).addValue(chars);
       },
 
+      waitUntilMatchingUsersListed: async () => {
+        let num = 0;
+        await this.waitUntil(async () => {
+          const text = await this.waitAndGetVisibleText('.Select-option');
+          num = text.length;
+          return num >= 0;
+        }, {
+          message: () => `Waiting for add-user dropdown options, currently: ${0}`
+        })
+      },
+
       hitEnterToSelectUser: async () => {
         // Dupl code. [.react_select]
         // Might not work in Firefox. Didn't in wdio v4.
@@ -5849,6 +5862,7 @@ export class TyE2eTestBrowser {
             // username + '\n');
             username);
 
+        await this.addUsersToPageDialog.waitUntilMatchingUsersListed();
         await this.addUsersToPageDialog.hitEnterToSelectUser();
 
 
@@ -6442,6 +6456,22 @@ export class TyE2eTestBrowser {
       },
     };
 
+
+    // Where to place this? Two buttons, or links, visible next to the Reply button
+    // at the top of an embedded comments iframe, if you're admin.
+    blogButtons = {
+      // This link opens the Moderation page in a new browser tab.
+      clickAdminLinkSwitchToModTab: async () => {
+        await this.switchToEmbCommentsIframeIfNeeded();
+        await this.waitAndClick('.dw-a-admin');
+        // We're still in the embedded comments iframe.
+        await this.swithToOtherTabOrWindow();
+        // Now we're at the Talkyard forum, in another browser tab.
+        await this.adminArea.review.waitUntilLoaded();
+      },
+
+      // Other link:  .dw-a-other-topics
+    };
 
     topicTypeExpl = {
       isTopicTypeExplVisible: async (): Pr<Bo> => {
@@ -7655,8 +7685,11 @@ export class TyE2eTestBrowser {
         assert.ok(!await this.topic._isBodyVisible(postNr));
       },
 
-      refreshUntilPostNotPendingApproval: async (postNr: PostNr) => {
+      refreshUntilPostNotPendingApproval: async (postNr: PostNr, ps: { isEmbedded?: Bo } = {}) => {
         await this.waitUntil(async () => {
+          if (ps.isEmbedded) {
+            await this.switchToEmbeddedCommentsIrame();
+          }
           await this.topic.waitForLoaded();
           switch (postNr) {
             case c.TitleNr:
@@ -9708,9 +9741,40 @@ export class TyE2eTestBrowser {
           }
         },
 
+        setShowFilters: async (show: Bo) => {
+          await this.setCheckbox('.e_ShowFil input', show);
+        },
+
+        setUsernameFilter: async (text: St) => {
+          await this.waitAndSetValue('.s_A_Us .e_UnFil input', text);
+        },
+
+        setEmailFilter: async (text: St) => {
+          await this.waitAndSetValue('.s_A_Us .e_EmFil input', text);
+        },
+
+        setFullNameFilter: async (text: St) => {
+          await this.waitAndSetValue('.s_A_Us .e_NameFil input', text);
+        },
 
         waitForLoaded: async () => {
           await this.waitForVisible('.e_AdminUsersList');
+        },
+
+        canLoadMore: async (): Pr<Bo> => {
+          return await this.isVisible('.s_A_Us .e_MoreB');
+        },
+
+        hasLoadedAll: async (): Pr<Bo> => {
+          return await this.isVisible('.s_A_Us .e_0More');
+        },
+
+        loadMoreUsers: async (ps: { waitForNum?: Nr, waitForAll?: Bo }) => {
+          await this.waitAndClick('.s_A_Us .e_MoreB');
+          await this.waitForExist('.s_A_Us .e_LoadedMore');
+          if (ps.waitForNum || ps.waitForAll) {
+            await this.adminArea.users.waitForNumUsers(ps);
+          }
         },
 
         goToUser: async (user: St | Member) => {
@@ -9733,8 +9797,10 @@ export class TyE2eTestBrowser {
 
         assertUsenamesAreAndOrder: async (usernames: St[]) => {
           await this.adminArea.users.waitForLoaded();
+          // 3 seconds actually isn't enough, sometimes, on my Core i5 laptop. But 6 works fine.
+          const ps = usernames.length > 100 ? { allElemPromisesTimeoutMs: 6000 } : {};
           const actualUsernames = await this.waitAndGetListTexts(
-                  this.adminArea.users.usernameSelector);
+                  this.adminArea.users.usernameSelector, ps);
           tyAssert.deepEq(usernames, actualUsernames);
         },
 
@@ -9746,6 +9812,22 @@ export class TyE2eTestBrowser {
         asserExactlyNumUsers: async (num: Nr) => {
           await this.adminArea.users.waitForLoaded();
           await this.assertExactly(num, this.adminArea.users.usernameSelector);
+        },
+
+        waitForNumUsers: async (ps: Nr | { waitForNum?: Nr, waitForAll?: Bo }) => {
+          let actual: St | Nr = '?'
+          const ps2 = _.isNumber(ps) ? { waitForNum: ps } : ps;
+          // Wait for nothing?
+          dieIf(_.isUndefined(ps2.waitForNum) && _.isUndefined(ps2.waitForAll), 'TyE7FN2RJ5');
+          await this.waitUntil(async () => {
+            const numOk = _.isUndefined(ps2.waitForNum) ||
+                    ps2.waitForNum === (await this.count(this.adminArea.users.usernameSelector));
+            const waitAllOk = !ps2.waitForAll ? true :
+                                await this.adminArea.users.hasLoadedAll();
+            return numOk && waitAllOk;
+          }, {
+            message: () => `Waiting for ${j2s(ps2)} users, now: ${actual}`,
+          });
         },
 
         // Works only if exactly 1 user listed.
@@ -9895,16 +9977,55 @@ export class TyE2eTestBrowser {
           getUrl: async (): Pr<St> => {
             return await this.waitAndGetValue('.c_A_Api_Wh_Url input');
           },
+
           setUrl: async (url: St) => {
             await this.waitAndSetValue('.c_A_Api_Wh_Url input', url);
           },
 
-          setEnabled: async (enabled: Bo) => {
-            await this.setCheckbox('.c_A_Api_Wh_Ena input', enabled);
+          saveWebhook: async () => {
+            await this.waitAndClick('.c_Wh_SavB');
+            await this.waitForDisplayed('.e_Wh_Savd');
           },
 
-          clickSave: async () => {
-            await this.waitAndClick('.e_Wh_SavB');
+          startWebhook: async () => {
+            await this.waitAndClick('.e_Wh_StartB');
+            await this.waitForDisplayed('.c_Wh_Act-Run');
+          },
+
+          startFresh: async () => {
+            await this.waitAndClick('.e_Wh_StartFreshB');
+            await this.waitAndClick('.e_YesFresh');
+            await this.waitUntilModalGone();
+            await this.waitForDisplayed('.c_Wh_Act-Run');
+          },
+
+          skipToNow: async () => {
+            await this.waitAndClick('.e_Skip2NowB');
+            await this.waitAndClick('.e_YesSkip');
+            await this.waitAndClick('.e_Really');
+            await this.waitUntilModalGone();
+            await this.waitForGone('.e_Skip2NowB');
+          },
+
+          pauseWebhook: async () => {
+            await this.waitAndClick('.e_Wh_PauseB');
+            await this.waitForDisplayed('.c_Wh_Act-Pau');
+          },
+
+          isPaused: async (): Pr<Bo> => {
+            return await this.isDisplayed('.c_Wh_Act-Pau');
+          },
+
+          isRunning: async (): Pr<Bo> => {
+            return await this.isDisplayed('.c_Wh_Act-Run');
+          },
+
+          allCaughtUp: async (): Pr<Bo> => {
+            return await this.isDisplayed('.e_Wh_AllDone');
+          },
+
+          lagsAfter: async (): Pr<Bo> => {
+            return await this.isDisplayed('.e_Wh_Lagging');
           },
         },
 
@@ -10793,11 +10914,15 @@ export class TyE2eTestBrowser {
 
       loginIfNeededViaMetabar: async (ps: NameAndPassword, clickPs?: WaitAndClickPs) => {
         await this.switchToEmbCommentsIframeIfNeeded();
+        const isWhereBef = this.#isWhere;
         await this.waitForMyDataAdded();
         if (!await this.metabar.isLoggedIn()) {
           logMessage(`Need to log in, as @${ps.username
                 } — session id cookie blocked? [TyM306MRKTJ]`);
           await this.complex.loginWithPasswordViaMetabar(ps, clickPs);
+        }
+        if (isWhereBef === IsWhere.EmbCommentsIframe) {
+          await this.switchToEmbeddedCommentsIrame();
         }
       },
 

@@ -657,7 +657,7 @@ class PlainApiActions(
         // Or 2) the user is logged in, and this request does include the HttpOnly
         // session part — all fine.
       }
-      else if (minAuthnStrength.fullSidRequired || staffOnly || adminOnly || superAdminOnly) {
+      else if (minAuthnStrength.fullSidRequired) {
         // Part 4 HttpOnly is required, but is missing.  Dupl code [btr_sid_part_4]
         assert(anyTySession.isDefined, "TyE04MWG245")
         assert(anyTySession.get.part4Absent, "TyE04MWG246")
@@ -669,7 +669,13 @@ class PlainApiActions(
         }
       }
       else {
-        // Part 4 of the session is missing, and the current endpoint doesn't need part 4
+        dieIf(adminOnly || superAdminOnly, "TyE702SKJXF")
+        // But `staffOnly` is fine. For example, EmbeddingStorageSid12 is used
+        // in the moderate-from-discussion endpoint, so can Approve/Reject/Ban directly
+        // from blog post page.
+
+        // Part 4 of the session is missing, otherwise we'd entered the `else if...part4Present`
+        // branch above instead.  And the current endpoint doesn't need part 4
         // (such endpoints are for embedded discussions — then, cookies don't work (they
         // generally don't work in iframes), so we're getting only session parts 1+2(+3) via
         // javascript and custom HTTP headers).

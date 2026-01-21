@@ -27,7 +27,7 @@ object Dependencies {
   }
 
   object Play {
-    val json = "org.playframework" %% "play-json" % "3.0.5"
+    val json = "org.playframework" %% "play-json" % "3.0.6"
   }
 
   object Libs {
@@ -75,22 +75,22 @@ object Dependencies {
     val elasticsearchClient = "org.elasticsearch" % "elasticsearch" % "6.8.23"
     val elasticsearchClientTransport = "org.elasticsearch.client" % "transport" % "6.8.23"
 
-    val guava = "com.google.guava" % "guava" % "33.4.8-jre"
+    val guava = "com.google.guava" % "guava" % "33.5.0-jre"
     val findbugsJsr304 = "com.google.code.findbugs" % "jsr305" % "3.0.2" % "provided"
 
     val rediscala = "com.github.etaty" %% "rediscala" % "1.9.0"
 
     // See: https://commons.apache.org/proper/commons-codec/changes.html
-    val apacheCommonsCodec = "commons-codec" % "commons-codec" % "1.19.0"
+    val apacheCommonsCodec = "commons-codec" % "commons-codec" % "1.20.0"
 
     // See: https://commons.apache.org/proper/commons-validator/changes-report.html
-    val apacheCommonsValidator = "commons-validator" % "commons-validator" % "1.10.0"
+    val apacheCommonsValidator = "commons-validator" % "commons-validator" % "1.10.1"
 
     // See: https://commons.apache.org/proper/commons-email/changes-report.html
     val apacheCommonsEmail = "org.apache.commons" % "commons-email" % "1.6.0"
 
     // See: https://commons.apache.org/proper/commons-lang/changes-report.html
-    val apacheCommonsLang3 = "org.apache.commons" % "commons-lang3" % "3.18.0"
+    val apacheCommonsLang3 = "org.apache.commons" % "commons-lang3" % "3.20.0"
 
     // Does v1.25 recognize .woff and .woff2 file extensions? Then can remove
     // extra checks in module ty-core. [5AKR20]
@@ -101,14 +101,14 @@ object Dependencies {
     val apacheTika = "org.apache.tika" % "tika-core" % "3.2.3"
 
     // See: https://github.com/OWASP/owasp-java-encoder/releases
-    val owaspEncoder = "org.owasp.encoder" % "encoder" % "1.3.1"
+    val owaspEncoder = "org.owasp.encoder" % "encoder" % "1.4.0"
 
     // See: https://github.com/jhy/jsoup/releases
-    val jsoup = "org.jsoup" % "jsoup" % "1.21.2"
+    val jsoup = "org.jsoup" % "jsoup" % "1.22.1"
 
     // See: https://github.com/FasterXML/jackson-module-scala/tags
     // and: https://mvnrepository.com/artifact/com.fasterxml.jackson.module/jackson-module-scala
-    val jacksonModuleScala = "com.fasterxml.jackson.module" %% "jackson-module-scala" % "2.19.0"
+    val jacksonModuleScala = "com.fasterxml.jackson.module" %% "jackson-module-scala" % "2.19.4"
 
     // ScribeJava, an OAuth lib, also works for OIDC (OpenID Connect).
     // ScribeJava is listed by Microsoft as compatible with Azure,
@@ -145,6 +145,7 @@ object Dependencies {
 
     // See: https://github.com/logfellow/logstash-logback-encoder/releases
     // and: https://mvnrepository.com/artifact/net.logstash.logback/logstash-logback-encoder
+    // Don't upgr to v9 — has minimum Java version 17.
     val logstashLogbackEncoder = "net.logstash.logback" % "logstash-logback-encoder" % "8.1"
     //"org.kurochan" %% "logback-stackdriver-logging" % "0.0.1",
 
@@ -163,7 +164,7 @@ object Dependencies {
     // See: https://github.com/dropwizard/metrics/releases
     // and: https://metrics.dropwizard.io/4.2.0/manual/core.html
     // and: https://mvnrepository.com/artifact/io.dropwizard.metrics/metrics-core
-    val metricsCore = "io.dropwizard.metrics" % "metrics-core" % "4.2.33"
+    val metricsCore = "io.dropwizard.metrics" % "metrics-core" % "4.2.37"
 
     // Deprecated. SHOULD migrate to OpenTelemetry, they say, https://opentelemetry.io/.
     // 1.8.1 exists now.

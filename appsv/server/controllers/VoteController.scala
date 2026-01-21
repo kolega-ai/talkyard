@@ -157,7 +157,8 @@ class VoteController @Inject()(cc: ControllerComponents, edContext: TyContext)
     }
 
     val theVoteType = PostVoteType.fromInt(voteType) getOrElse throwBadArgument("EdE2QTKB40", "voteType")
-    val voters = dao.readOnlyTransaction { tx =>
+    val voters = dao.readTx { tx =>
+      // Later, hide details of private users. [private_pats]
       val ids = tx.loadVoterIds(postId, theVoteType)
       tx.loadParticipants(ids)
     }

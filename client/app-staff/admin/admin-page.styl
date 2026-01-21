@@ -254,7 +254,11 @@
 .s_A_Us
   margin: 21px 0 30px;
 
-.c_A_Fils
+.c_A_Us_ShowWhat .form-group
+  display: inline-block;
+  margin-right: 3ex;
+
+.c_A_Us_Fils
   display: flex;
   .form-group:not(:last-child)
     margin-right: 1em;
@@ -312,6 +316,22 @@
 .s_A_Us_UsL_U_Modif
   color: hsl(0, 0%, 37%);
   margin-left: 0.6ex;
+
+.c_ExtIds
+  white-space: pre-wrap;
+  word-break: break-all;
+  overflow-wrap: anywhere;
+
+.c_A_Us_Fils input
+  // The search is case insensitive, so showing mixed case would be misleading.
+  text-transform: lowercase;
+
+.c_A_U_Fils_Sch
+  display: flex;  // so margin-top: auto below will work.
+  flex-direction: column;
+
+.c_A_U_Fils_Sch_B
+  margin-top: auto;  // works, because the parent <div> is a flexbox (see just above)
 
 
 // A single user

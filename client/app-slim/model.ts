@@ -1629,6 +1629,34 @@ const enum AvatarSize {
 }
 
 
+interface PeopleFilter {
+  /* Change `whichUsers` in `listUsers(whichUsers, ...)` to a filter list instead?:
+  hasWithVerifiedEmail?: Bo
+  isApproved?: Bo
+  isPendingApproval?: Bo
+  isStaff?: Bo
+  isSuspended?: Bo
+  isSilenced?: Bo
+  isThreat?: Bo
+  */
+
+  username?: St
+  fullName?: St
+  emailAddr?: St
+  ipAddr?: St  // not impl [find_user_by_ip]
+  extId?: St
+
+  exact?: Bo   // not impl [0_exact_ppl_search]
+}
+
+
+// For now. For sort order signup-date-descending.
+interface PeopleOffset {
+  createdAtMsLte: WhenMs
+  idLt: PatId
+}
+
+
 interface MemberIdName {
   id: UserId;
   username: string;
@@ -1791,7 +1819,8 @@ interface PatVb extends MemberInclDetails, BioWebsiteLocation,
       // privPrefsOwn and ...Def are for editing one's prefs, and only included
       // for oneself or staff.
       PrivacyPrefs {
-  externalId?: string;
+  externalId?: string; // RENAME to extId
+  ssoId?: St;
   createdAtEpoch: number;  // change to millis
   fullName?: string;
   email: string; // RENAME to emailAdr  [email_2_emailAdr]
@@ -2631,6 +2660,19 @@ interface Webhook {
 }
 
 
+interface ListWebhooksResp {
+  webhooks: Webhook[]
+  lastEvtInf: LastEvtInf
+}
+
+interface LastEvtInf {
+  nowMs: WhenMs
+  // So can estimate each webhook's backlog size.
+  lastEventId: Nr
+  lastEventAtMs: WhenMs
+}
+
+
 // Sync w Scala:  def JsWebhookReqOut(webhook: Webhook).
 //
 interface WebhookReqOut {
@@ -3443,6 +3485,12 @@ interface SendInvitesResponse {
   alreadyInvitedAddresses: string[];
   alreadyJoinedAddresses: string[];
   failedAddresses: string[];
+}
+
+
+interface ListUsersResponse {
+  users: UserInclDetailsWithStats[]
+  maybeMore: Bo
 }
 
 

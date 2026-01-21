@@ -425,7 +425,7 @@ function runAllE2eTests {
 
   $r s/wdio --only group-profile-change-things.2browsers $args
 
-  $r s/wdio --only many-users-mention-list-join-group.2browsers $args
+  $r s/wdio-7 --only many-users-mention-list-join-group.2br --cd -i $args
   #$r s/wdio --only many-users-large-group.2browsers $args
   #$r s/wdio --only many-groups.2browsers $args
   #$r s/wdio --only many-users-many-large-groups.2browsers $args
@@ -726,6 +726,8 @@ function runAllE2eTests {
   $r s/wdio       --only embedded-comments-conf-notf-pref-first $args
 
   $r s/wdio-7     --only embcom.sort-order-op-likes-btn-txt.2br.ec --cd -i $args
+
+  $r s/wdio-7     --only embcom-modn-from-disc-appr-befr.2br.ec --cd -i $args
 
   $r s/wdio       --only embedded-comments-category-refs.2browsers $args
   $r s/wdio       --only embedded-comments-cat-refs-and-disc-ids.2browsers $args

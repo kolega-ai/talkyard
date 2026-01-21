@@ -141,7 +141,7 @@ GET   /-/load-cats-tags-site-notf-prefs  controllers.UserController.loadMembersC
 POST  /-/save-privacy-prefs     controllers.UserController.saveMemberPrivacyPrefs
 POST  /-/save-guest             controllers.UserController.saveGuest
 POST  /-/delete-user            controllers.UserController.deleteUser
-GET   /-/list-complete-users    controllers.UserController.listCompleteUsers(whichUsers)
+GET   /-/list-users             controllers.UserController.listUsers(whichUsers, username: Option[String], fullName: Option[String], emailAddr: Option[String], ipAddr: Option[String], extId: Option[String], sortOrder: Option[Int], exact: Option[Boolean], createdAtMsLte: Option[Long], idLt: Option[Int])
 GET   /-/load-user-any-details  controllers.UserController.loadUserAnyDetails(who)
 POST  /-/edit-member            controllers.UserController.editMember
 POST  /-/lock-trust-level       controllers.UserController.lockTrustLevel
@@ -383,6 +383,7 @@ GET   /-/ams0/list-coworkers     controllers.SuperAdminController.listCoworkersA
 
 GET   /-/list-webhooks          talkyard.server.events.WebhooksController.listWebhooks
 POST  /-/upsert-webhooks        talkyard.server.events.WebhooksController.upsertWebhooks
+POST  /-/alter-webhook          talkyard.server.events.WebhooksController.alterWebhook
 POST  /-/delete-webhooks        talkyard.server.events.WebhooksController.deleteWebhooks
 POST  /-/retry-webhook          talkyard.server.events.WebhooksController.retryWebhook
 GET   /-/list-webhook-reqs-out  talkyard.server.events.WebhooksController.listWebhookReqsOut(webhookId: Int)

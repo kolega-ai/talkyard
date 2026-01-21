@@ -25,16 +25,7 @@ import _root_.sbtbuildinfo.BuildInfoPlugin.autoImport._
 // Note: In VSCode, the Scala Metals plugin, one needs to run the
 // 'Metals: Import Build' task for Metals to notice a Scala version change.
 //
-// Can't upgrade to Play 2.9, until using Scala 2.13.x — these Play libs aren't built
-// for Scala 2.12: (but are built for 2.13, then, no download errors)
-//    sbt.librarymanagement.ResolveException: Error downloading  [all of these:]
-//       com.typesafe.play:play-caffeine-cache_2.12:2.9.2
-//       com.typesafe.play:play-filters-helpers_2.12:2.9.2
-//       com.typesafe.play:play-akka-http-server_2.12:2.9.2
-//       com.typesafe.play:play-ahc-ws_2.12:2.9.2
-//       com.typesafe.play:play-server_2.12:2.9.2
-//
-ThisBuild / scalaVersion := "2.13.16"
+ThisBuild / scalaVersion := "2.13.18"
 
 // Scala 2.13 disables postfix notation, e.g. `something isEmpty`. Enable, so won't
 // have to modify sooo many files when upgrading to 2.13.

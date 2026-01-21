@@ -55,11 +55,37 @@ class UserController @Inject()(cc: ControllerComponents, edContext: TyContext)
   val MaxEmailsPerUser: Int = 5  // also in js [4GKRDF0]
 
 
-  def listCompleteUsers(whichUsers: St): Action[Unit] = StaffGetAction { req =>
+  def listUsers(
+        whichUsers: St,
+        username: Opt[St],
+        fullName: Opt[St],
+        emailAddr: Opt[St],
+        ipAddr: Opt[St],     // not in use
+        extId: Opt[St],
+        sortOrder: Opt[Int], // not in use
+        exact: Opt[Bo],      // not in use
+        createdAtMsLte: Opt[i64],
+        idLt: Opt[PatId],
+        ): Action[Unit] = StaffGetActionRateLimited(RateLimits.ReadsFromDb) { req =>
     import req.dao
+
+    unimplIf(ipAddr.isDefined, "ipAddr=... [TyE5FKS2I6]")
+    unimplIf(sortOrder.isDefined, "sortOrder=... [TyE5FKS2I7]")
+    unimplIf(exact.is(true), "exact=true [TyE5FKS2I8]")  // [0_exact_ppl_search]
+
     val settings = dao.getWholeSiteSettings()
-    var orderOffset: PeopleOrderOffset = PeopleOrderOffset.BySignedUpAtDesc
-    var peopleFilter = PeopleFilter()
+
+    val orderOffset: PeopleOrderOffset = PeopleOrderOffset.BySignedUpAtDesc(
+          createdAtMsLte = When.fromOptMillis(createdAtMsLte),
+          idLt = idLt)(IfBadAbortReq)
+
+    var peopleFilter = PeopleFilter(
+          username = username,
+          fullName = fullName,
+          emailAddr = emailAddr,
+          ipAddr = ipAddr,
+          extId = extId,
+          exact = exact.getOrElse(false))
 
     whichUsers match {
       case "EnabledUsers" =>
@@ -89,7 +115,8 @@ class UserController @Inject()(cc: ControllerComponents, edContext: TyContext)
 
     dao.readTx { tx =>
       // Ok to load also deactivated users — the requester is staff.
-      val membersAndStats = tx.loadUsersInclDetailsAndStats(peopleQuery)
+      val res = tx.loadUsersInclDetailsAndStats(peopleQuery)
+      val membersAndStats = res.items
       val members = membersAndStats.map(_._1)
       val reviewerIds = members.flatMap(_.reviewedById)
       val suspenderIds = members.flatMap(_.suspendedById)
@@ -107,7 +134,8 @@ class UserController @Inject()(cc: ControllerComponents, edContext: TyContext)
               maySeePresence = settings.enablePresence,
               callerIsStaff = true, anyStats = anyStats)
       }))
-      OkSafeJson(Json.obj("users" -> usersJson))
+
+      OkSafeJson(Json.obj("users" -> usersJson, "maybeMore" -> res.maybeMore))
     }
   }
 

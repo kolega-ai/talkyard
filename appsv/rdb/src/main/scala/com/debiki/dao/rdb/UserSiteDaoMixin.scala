@@ -1029,11 +1029,56 @@ trait UserSiteDaoMixin extends SiteTransaction {  // RENAME; QUICK // to UserSit
 
 
   def loadUsersInclDetailsAndStats(peopleQuery: PeopleQuery)
-        : immutable.Seq[(UserInclDetails, Option[UserStats])] = {
+        : ListResult[(UserInclDetails, Option[UserStats])] = {
     val order = peopleQuery.orderOffset
     val filter = peopleQuery.peopleFilter
+    val values = ArrayBuffer(siteId.asAnyRef)
 
-    TESTS_MISSING // so many possible combinations
+    // Tests:
+    //  - many-users-mention-list-join-group.2browsers.test.ts  TyT0326SKDGW2.TyTSTAUSRLSFIL
+
+    // These `like "%...%"` clauses are inefficient.  But previously we were doing
+    // a full per-site table scan and trying to send *everything* back to the browser.
+    // At least this, combined with rate limits, is not that much different.
+    // Later: Do `like...` and fuzzy search using GIN indexes or use
+    // ElasticSearch. [fuzzy_user_search]
+    //
+    // The end user might have specified "%" or "?" in the search string, I think
+    // that's ok for now, we're already doing full scans anyway.
+    // Later: Don't add '%', and reject any '%' and '?" and other SQL `like` special chars,
+    // if `PeopleFilter.exact` is true. [0_exact_ppl_search]
+
+    // The search is case insensitive: ilike.  [user_ilike_search]
+
+    val andUsernameEq =
+          filter.username map { un =>
+            values.append("%" + un + "%")
+            s"and username ilike ?"
+          } getOrElse ""
+
+    val andFullNameEq =
+          filter.fullName map { fn =>
+            values.append("%" + fn + "%")
+            s"and full_name ilike ?"
+          } getOrElse ""
+
+    val andEmailEq =
+          filter.emailAddr map { adr =>
+            UX; COULD // search people's other addresses too [search_all_email_adrs],
+            // they're in  user_emails3.email_address.
+            values.append("%" + adr + "%")
+            s"and primary_email_addr ilike ?"
+          } getOrElse ""
+
+    val andExtIdEq =
+          filter.extId map { extId =>
+            values.append("%" + extId + "%")
+            values.append("%" + extId + "%")
+            // Maybe use `like` instead? If there're random ids w mixed casing?
+            // But probably it's better to in extremely rare cases see a few rows too many,
+            // than to not find what one is searching for? So, use `ilike`, for now.
+            s"and (sso_id ilike ? or ext_id ilike ?)"
+          } getOrElse ""
 
     val andEmailVerified =
       if (filter.onlyWithVerifiedEmail) s"and (email_verified_at is not null or $IsOwnerOrStaff)"
@@ -1069,9 +1114,31 @@ trait UserSiteDaoMixin extends SiteTransaction {  // RENAME; QUICK // to UserSit
         ))"""
       else ""
 
-    val orderBy =
-      if (order == PeopleOrderOffset.BySignedUpAtDesc) "order by created_at desc, user_id desc"
-      else "order by username, full_name, user_id"
+    val (orderBy, andAnyOffset) = peopleQuery.orderOffset match {
+      case ofs: PeopleOrderOffset.BySignedUpAtDesc =>
+        val anyOffset = ofs.createdAtMsLte match {
+          case Some(whenMs) =>
+            values.append(whenMs.asTimestamp)
+            ofs.idLt match {
+              case None =>
+                "and u.created_at <= ?"
+              case Some(id) =>
+                values.append(whenMs.asTimestamp)
+                values.append(id.asAnyRef)
+                "and (u.created_at < ? or (u.created_at = ? and u.user_id < ?))"
+            }
+          case None =>
+            dieIf(ofs.idLt.isDefined, "TyE2GKSEHJ0")
+            ""
+        }
+        ("order by created_at desc, user_id desc",
+          anyOffset)
+
+      //case PeopleOrderOffset.ByUsername =>  // later, maybe
+      // "order by username, user_id"
+    }
+
+    val limit = 50  // E2e tests assume 50. [limit_50]
 
     val query = s"""
       select u.user_id, $CompleteUserSelectListItemsNoUserId, $UserStatsSelectListItems
@@ -1086,10 +1153,19 @@ trait UserSiteDaoMixin extends SiteTransaction {  // RENAME; QUICK // to UserSit
         $andIsStaff
         $andIsSuspended
         $andIsThreat
+
+        $andUsernameEq
+        $andFullNameEq
+        $andEmailEq
+        $andExtIdEq
+
+        $andAnyOffset
+
         $orderBy
+        limit $limit
       """
 
-    runQueryFindMany(query, List(siteId.asAnyRef), rs => {
+    val users = runQueryFindMany(query, values.toList, rs => {
       // Don't remember if maybe there are old users, with no stats data created yet?
       val anyLastSeen = getOptWhen(rs, "last_seen_at")
       val anyStats = if (anyLastSeen.isEmpty) None else Some(getUserStats(rs))
@@ -1101,6 +1177,10 @@ trait UserSiteDaoMixin extends SiteTransaction {  // RENAME; QUICK // to UserSit
 
       (user, anyStats)
     })
+
+    val maybeMore = users.length == limit
+
+    ListResult(users, maybeMore)
   }
 
 

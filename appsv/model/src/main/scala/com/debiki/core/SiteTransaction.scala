@@ -26,6 +26,9 @@ import col.{immutable => imm}
 import Prelude._
 
 
+case class ListResult[T](items: ImmSeq[T], maybeMore: Bo)
+
+
 trait SiteTransaction {   RENAME // to SiteTx — already started with a type SiteTx = this
   def commit(): Unit
   def rollback(): Unit
@@ -717,15 +720,16 @@ trait SiteTransaction {   RENAME // to SiteTx — already started with a type Si
 
   def loadStaffUsers(): immutable.Seq[User] =
     loadUsers(PeopleQuery(
-      orderOffset = PeopleOrderOffset.BySignedUpAtDesc, // order doesn't matter
+      // There's typically few staff users, so we'll load all, order won't matter.
+      orderOffset = PeopleOrderOffset.BySignedUpAtDesc(None, None)(IfBadDie),
       peopleFilter = PeopleFilter(onlyStaff = true)))
 
   def loadUsers(peopleQuery: PeopleQuery): immutable.Seq[User] =
     // For now. (Loads some unneeded things.)
-    loadUsersInclDetailsAndStats(peopleQuery).map(_._1.briefUser)
+    loadUsersInclDetailsAndStats(peopleQuery).items.map(_._1.briefUser)
 
   def loadUsersInclDetailsAndStats(peopleQuery: PeopleQuery)
-    : immutable.Seq[(UserInclDetails, Option[UserStats])]
+      : ListResult[(UserInclDetails, Option[UserStats])]
 
   def loadTheUserInclDetailsAndStatsById(userId: UserId): (UserInclDetails, Option[UserStats]) = {
     COULD_OPTIMIZE // Could write a query that loads both. Reuse loadUsersInclDetailsAndStats?

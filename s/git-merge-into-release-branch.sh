@@ -32,19 +32,22 @@ if [ "$dbg" = "t" ]; then
   echo "dupls_most_recent: $dupls_most_recent"
 fi
 
-year="$(date +%Y)"
-if [[ ! $next_version =~ ^v0\.$year\. ]]; then
-  echo
-  echo "Wrong year in version number, should be $year:  $next_version"
-  echo
-  echo "Edit  version.txt — bump the year, and reset the in-year version to 001."
-  echo
-  echo "And, don't forget to bump the GPLv2 change dates"
-  echo "in  README.md,  and the copyright-up-to year too."
-  echo "(4 edits in total, in 2 files.)"
-  echo
-  exit 1
-fi
+# Stop bumping year. v0.2025.NNN is hereafter a medium-or-LTS bugfix branch, while
+# new features will be in v1.2026.NNN.
+#
+#year="$(date +%Y)"
+#if [[ ! $next_version =~ ^v0\.$year\. ]]; then
+#  echo
+#  echo "Wrong year in version number, should be $year:  $next_version"
+#  echo
+#  echo "Edit  version.txt — bump the year, and reset the in-year version to 001."
+#  echo
+#  echo "And, don't forget to bump the GPLv2 change dates"
+#  echo "in  README.md,  and the copyright-up-to year too."
+#  echo "(4 edits in total, in 2 files.)"
+#  echo
+#  exit 1
+#fi
 
 if [ "$dupls_most_recent" == "2 $next_version" ]; then
   echo

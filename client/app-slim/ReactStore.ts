@@ -1291,7 +1291,7 @@ function upsertPost(post: Post, pageId: PageId, ps: { isCollapsing?: Bo } = {}):
 
 // Maybe RENAME to sth that incl "processPost"? Since that's done too.
 function _showMyNewPostsIfAny(upsertResults: UpsertPostResult[]) {
-  if (upsertResults.length)
+  if (!upsertResults.length)
     return;
 
   setTimeout(showMyPosts, 1);
@@ -1301,7 +1301,7 @@ function _showMyNewPostsIfAny(upsertResults: UpsertPostResult[]) {
     for (let res of upsertResults) {
       const oldVersion = res.postBef;
       const post = res.postAft;
-      debiki2.page.Hacks.processPosts('post-' + post.uniqueId);
+      debiki2.page.Hacks.processPosts('post-' + post.nr);
       if (!oldVersion && post.authorId === store.me.id && !post.isPreview &&
           // Need not flash these — if one does sth that results in a meta comment,
           // then one is aware about that already (since one did it oneself).
@@ -2865,13 +2865,13 @@ function saveMarksInLocalStorage(marks: { [postId: number]: any }) {
 }
 
 
-function rememberPostsToQuickUpdate(startPostId: number) {
+function rememberPostsToQuickUpdate(startPostNr: PostNr) {
   store.quickUpdate = true;
   const currentPage: Page = store.currentPage;
   const postsByNr = currentPage.postsByNr;
-  let post = postsByNr[startPostId];
+  let post = postsByNr[startPostNr];
   if (!post) {
-    console.warn('Cannot find post to quick update, nr: ' + startPostId + ' [DwE4KJG0]');
+    console.warn('Cannot find post to quick update, nr: ' + startPostNr + ' [TyE4KJG0]');
     return;
   }
 

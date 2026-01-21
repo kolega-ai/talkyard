@@ -20,6 +20,7 @@ package talkyard.server.events
 import com.debiki.core._
 import com.debiki.core.Prelude._
 import debiki.dao.SiteDao
+import debiki.EdHttp.throwNotFound
 import talkyard.{server => tys}
 import talkyard.server.authz.AuthzCtxOnForum
 
@@ -90,13 +91,34 @@ trait WebhooksSiteDaoMixin {
             retryExtraTimes = webhook.retryExtraTimes,
             )(IfBadAbortReq)
 
-      // If enabling, don't send past event — only future events.
-      UX // Actually, maybe should ask the admin what hen wants? See below...
-      val isEnabling = !webhookBef.enabled && webhook.enabled
-      if (isEnabling) {
-        tx.loadEventsFromAuditLog(1, newestFirst = true).headOption foreach { event =>
+      tx.upsertWebhook(webhookToSave)
+      webhookToSave
+    }
+  }
 
-          // ... This sometimes makes sense:
+
+  def alterWebhookConf(webhookId: WebhookId, mutation: Webhook.WebhookMutation): Webhook = {
+    // Fix some time later, in [ty_v1].  [webhooks_ty_v1]
+    dieIf(globals.isProdLive && this.siteId != globals.defaultSiteId,
+          "TyEWEBH0SELFH7", "Not self hosted")
+    dieIf(webhookId != 1, "TyE603MRAEPJ7") // for now [only_1_webhook]
+
+    writeTx { (tx, _) =>
+      val webhookBef: Webhook = tx.loadWebhook(webhookId) getOrElse {
+        throwNotFound("TyE4LJKR29", s"No webhook with id ${webhookId}")
+      }
+
+      var webhookToSave = webhookBef
+      mutation.setPaused foreach { paused =>
+        webhookToSave = webhookToSave.copy(enabled = !paused)(IfBadAbortReq)
+      }
+
+      val skipToNow = mutation.skipToNow ||
+            // When starting the webhook for the first time,  [start_webhook_at_now]
+            // start sending at the current time (don't send old events).
+            mutation.setPaused.is(false) && webhookBef.sentUpToEventId.isEmpty
+      if (skipToNow) {
+        tx.loadEventsFromAuditLog(1, newestFirst = true).headOption foreach { event =>
           val doneUpToId = math.max(event.id, webhookBef.sentUpToEventId getOrElse -1)
           val doneUpToWhen = When.latestOf(event.doneAtWhen, webhookBef.sentUpToWhen)
           webhookToSave = webhookToSave.copyAsWorking(
@@ -104,10 +126,6 @@ trait WebhooksSiteDaoMixin {
                 sentUpToEventId = Some(doneUpToId),
                 numPendingMaybe = None,
                 doneForNow = None)
-
-          // ... But leaving it as is too, makes sense sometimes as well
-          // (if maybe disabling for 10 minutes, to do something, and then resuming
-          // — might want to get all events, then).
 
           COULD_OPTIMIZE // set doneForNow = true and numPendingMaybe = 0.
         }
@@ -120,6 +138,9 @@ trait WebhooksSiteDaoMixin {
 
 
   def sendPendingWebhookReqs(webhooks: ImmSeq[Webhook]): U = {
+    dieIf(globals.isProdLive && this.siteId != globals.defaultSiteId, // [webhooks_ty_v1]
+          "TyEWEBH0SELFH8", "Not self hosted")
+
     webhooks foreach { whk =>
       try {
         sendReqsForOneWebhook(whk)
@@ -175,7 +196,7 @@ trait WebhooksSiteDaoMixin {
   * Otherwise there could e.g. be next-request-nr collisions, and things would get
   * more complicated for no good reason.
   */
-  def sendReqsForOneWebhook(webhookMaybeStale: Webhook): U = {
+  private def sendReqsForOneWebhook(webhookMaybeStale: Webhook): U = {
     val (webhook, events: ImmSeq[Event], now_, reqNr: i32, anyRetryNr: Opt[RetryNr]) =
           readTx { tx =>
 
@@ -270,6 +291,7 @@ trait WebhooksSiteDaoMixin {
       // ----- Find events to send
 
       // Maybe break out to own fn?  Dao.loadEvents()?  [load_events_fn]
+      // This loads events for unapproved posts too. [post_event_approved]
       val logEntries = tx.loadEventsFromAuditLog(newerOrAt = Some(webhook.sentUpToWhen),
             newerThanEventId = webhook.sentUpToEventId,
             limit = webhook.sendMaxEventsPerReq.getOrElse(1),  // [whks_1_event]
@@ -455,6 +477,10 @@ trait WebhooksSiteDaoMixin {
 
 
   private def sendWebhookRequest(reqOut: WebhookReqOut): Future[WebhookReqOut] = {
+    dieIf(globals.isProdLive && this.siteId != globals.defaultSiteId, // [webhooks_ty_v1]
+          "TyEWEBH0SELFH9", "Not self hosted")
+
+    // Check if self-hosted
     val wsClient: WSClient = globals.wsClient
     val request: WSRequest =
           wsClient.url(reqOut.sentToUrl).withHttpHeaders(

@@ -23,8 +23,8 @@ import com.debiki.core.Prelude._
 import talkyard.server.{TyContext, TyController}
 import talkyard.server.http._
 import WebhooksParSer._
-import debiki.JsonUtils.{parseJsArray, parseInt32}
-import debiki.EdHttp.throwBadReqIf
+import debiki.JsonUtils.{parseJsArray, parseInt32, parseOptBo, parseBoDef}
+import debiki.EdHttp.{throwBadReqIf, throwForbiddenIf}
 import debiki.RateLimits
 
 import javax.inject.Inject
@@ -36,6 +36,7 @@ import play.api.mvc._
 class WebhooksController @Inject()(cc: ControllerComponents, tyContext: TyContext)
   extends TyController(cc, tyContext) {
 
+  import context.globals.{defaultSiteId, isProdLive}
 
   def listWebhooks(): Action[U] = AdminGetAction { req: GetRequest =>
     listWebhooksImpl(req)
@@ -44,16 +45,27 @@ class WebhooksController @Inject()(cc: ControllerComponents, tyContext: TyContex
 
   private def listWebhooksImpl(req: DebikiRequest[_]): Result = {
     import req.dao
-    val webhooks = dao.readTx { tx =>
-      tx.loadAllWebhooks()
+    val (webhooks, anyLastEvent, nowMs) = dao.readTx { tx =>
+      val webhooks = tx.loadAllWebhooks()
+      val anyLastEvent = tx.loadEventsFromAuditLog(limit = 1, newestFirst = true).headOption
+      (webhooks, anyLastEvent, tx.now)
     }
-    OkSafeJson(Json.obj(
-        "webhooks" -> JsArray(webhooks map JsWebhook)))
+    import talkyard.server.JsX._
+    OkSafeJson(Json.obj(  // ts: ListWebhooksResp
+        "webhooks" -> JsArray(webhooks map JsWebhook),
+        "lastEvtInf" -> Json.obj(  // ts: LastEvtInf
+          "nowMs" -> JsWhenMs(nowMs),
+          "lastEventId" -> JsNum64OrNull(anyLastEvent.map(_.id)),
+          "lastEventAtMs" -> JsWhenMsOrNull(anyLastEvent.map(e => When.fromDate(e.doneAt))))))
   }
 
 
   def upsertWebhooks: Action[JsValue] = AdminPostJsonAction2(RateLimits.AdminWritesToDb,
         maxBytes = 8000) { req: JsonPostRequest =>
+    // Fix some time later, in [ty_v1].  [webhooks_ty_v1]
+    throwForbiddenIf(isProdLive && req.siteId != defaultSiteId,
+          "TyEWEBH0SELFH1", "Not self hosted")
+
     import req.dao
     val jsWebhooks: Seq[JsValue] = parseJsArray(req.body, "webhooks")
     val webhooks: Seq[Webhook] =
@@ -63,6 +75,21 @@ class WebhooksController @Inject()(cc: ControllerComponents, tyContext: TyContex
     val webhooksAfter = webhooks map dao.upsertWebhookConf
     OkSafeJson(Json.obj(
         "webhooks" -> JsArray(webhooksAfter map JsWebhook)))
+  }
+
+
+  def alterWebhook: Action[JsValue] = AdminPostJsonAction2(RateLimits.AdminWritesToDb,
+        maxBytes = 500) { req: JsonPostRequest =>
+    throwForbiddenIf(isProdLive && req.siteId != defaultSiteId, // webhooks_ty_v1
+          "TyEWEBH0SELFH3", "Not self hosted")
+
+    import req.{dao, body}
+    val webhookId = parseInt32(body, "webhookId")
+    val mutation = Webhook.WebhookMutation(
+          setPaused = parseOptBo(body, "setPaused"),
+          skipToNow = parseBoDef(body, "skipToNow", false))
+    dao.alterWebhookConf(webhookId, mutation)
+    this.listWebhooksImpl(req)
   }
 
 
@@ -84,6 +111,9 @@ class WebhooksController @Inject()(cc: ControllerComponents, tyContext: TyContex
 
   def retryWebhook: Action[JsValue] = AdminPostJsonAction2(RateLimits.AdminWritesToDb,
         maxBytes = 80) { req: JsonPostRequest =>
+    throwForbiddenIf(isProdLive && req.siteId != defaultSiteId, // [webhooks_ty_v1]
+          "TyEWEBH0SELFH5", "Not self hosted")
+
     val webhookId: WebhookId = parseInt32(req.body, "webhookId")
     // Move to WebhooksSiteDaoMixin?
     req.dao.writeTx { (tx, _) =>
@@ -93,7 +123,7 @@ class WebhooksController @Inject()(cc: ControllerComponents, tyContext: TyContex
       val webhookAft = webhook.copy(retryExtraTimes = Some(1))(IfBadAbortReq)
       tx.upsertWebhook(webhookAft)
     }
-    Ok
+    listWebhooksImpl(req)
   }
 
 

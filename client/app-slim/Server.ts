@@ -1472,10 +1472,22 @@ export function loadPatVvbPatchStore(userIdOrUsername: UserId | St,
 }
 
 
-export function listCompleteUsers(whichUsers, success: (users: UserInclDetailsWithStats[]) => void) {
-  get(`/-/list-complete-users?whichUsers=${whichUsers}`, response => {
-    success(response.users);
-  });
+export function listUsers(whichUsers: St, filters: PeopleFilter, offset: PeopleOffset | NU,
+        onOk: (_: ListUsersResponse) => V) {
+  let params = new URLSearchParams();
+  params.set('whichUsers', whichUsers);
+  if (filters.username) params.set('username', filters.username);
+  if (filters.fullName) params.set('fullName', filters.fullName);
+  if (filters.emailAddr) params.set('emailAddr', filters.emailAddr);
+  if (filters.ipAddr) params.set('ipAddr', filters.ipAddr);
+  if (filters.extId) params.set('extId', filters.extId);
+  if (offset) {
+    params.set('createdAtMsLte', offset.createdAtMsLte + '');
+    if (offset.idLt) {
+      params.set('idLt', offset.idLt + '');
+    }
+  }
+  get(`/-/list-users?` + params.toString(), onOk);
 }
 
 
@@ -2603,14 +2615,20 @@ export function markCurrentPageAsSeen() {
   }
 }
 
-
-export function listWebhooks(onOk: (webhooks: Webhook[]) => Vo) {
-  get('/-/list-webhooks', resp => onOk(resp.webhooks));
+       
+export function listWebhooks(onOk: (resp: ListWebhooksResp) => Vo) {
+  get('/-/list-webhooks', resp => onOk(resp));
 }
 
 
 export function upsertWebhooks(webhooks: Webhook[], onOk: (webhooks: Webhook[]) => Vo) {
   postJsonSuccess('/-/upsert-webhooks', resp => onOk(resp.webhooks), { webhooks });
+}
+
+
+export function alterWebhook(webhookId: WebhookId, mutation,
+        onOk: (resp: ListWebhooksResp) => V) {
+  postJsonSuccess('/-/alter-webhook', onOk, { webhookId, ...mutation });
 }
 
 
