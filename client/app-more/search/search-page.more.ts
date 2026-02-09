@@ -24,6 +24,21 @@
 
 const r = ReactDOMFactories;
 
+/**
+ * Sanitizes HTML content to prevent XSS attacks.
+ * Uses the existing Google Caja HTML sanitizer directly.
+ * 
+ * @param htmlContent The HTML content to sanitize
+ * @returns Sanitized HTML safe for rendering
+ */
+function sanitizeSearchHtml(htmlContent: string): string {
+  // Use Google Caja HTML sanitizer directly (same as used in editor)
+  // Note: Search highlighting HTML is already escaped server-side [7YK24W], 
+  // but we apply defensive sanitization for additional XSS protection
+  const d = { i: debiki.internal };
+  return d.i.googleCajaSanitizeHtml(htmlContent, false, false);
+}
+
 
 // COULD config the router to avoid % encoding in the URL inside tag names,
 // e.g. ',' ':' '/' needn't be escaped in the query:
@@ -85,7 +100,7 @@ var SearchPageContentComponent = createReactClass(<any> {
     const curParams = parseQueryString(this.props.location.search);
     const isNewQuery = oldParams.q !== curParams.q;
 
-    // Or if 2) the user clicks the Search button — then we'll update the URL to show the new query,
+    // Or if 2) the user clicks the Search button — then we'll update the URL to show the new query,
     // which triggers this receive-props. But then we've sent a search request already.
     const ignoreUrlChange = this.ignoreUrlChange;
     this.ignoreUrlChange = false;
@@ -396,7 +411,10 @@ function SearchResultListItem(props: { pageAndHits: PageAndHits, key?: St | Nr, 
   if (titleHit) {
     // (I wonder if any title is long enough to be split by ElasticSearch into two parts?
     // There's a max length: PageParts.MaxTitleLength in Scala.)
-    const safeHtml = titleHit.approvedTextWithHighlightsHtml.join(" <b>...</b> ");
+    // HTML content from search highlighting is already escaped server-side [7YK24W], 
+    // but we apply defensive sanitization for additional XSS protection
+    const rawHtml = titleHit.approvedTextWithHighlightsHtml.join(" <b>...</b> ");
+    const safeHtml = sanitizeSearchHtml(rawHtml);
     titleText = r.span({ className: 'esSERP_Hit_Text',
           dangerouslySetInnerHTML: { __html: safeHtml }});
   }
@@ -418,8 +436,10 @@ function SearchResultListItem(props: { pageAndHits: PageAndHits, key?: St | Nr, 
 
 function SearchResultHit(props: { hit: any, urlPath: string, key?: string | number }) {
   let hit: SearchHit = props.hit;
-  // Any html stuff was escaped here: [7YK24W].
-  let safeHtml = hit.approvedTextWithHighlightsHtml.join(" <b>...</b> ");
+  // HTML content from search highlighting is already escaped server-side [7YK24W], 
+  // but we apply defensive sanitization for additional XSS protection
+  const rawHtml = hit.approvedTextWithHighlightsHtml.join(" <b>...</b> ");
+  const safeHtml = sanitizeSearchHtml(rawHtml);
   const hitOp = hit.postNr === BodyNr ? ' c_SR_Hit-Op' : '';
   return (
     r.li({ className: 's_SR_Hit' + hitOp, key: props.key },
