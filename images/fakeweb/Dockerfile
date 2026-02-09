@@ -19,36 +19,25 @@ EXPOSE 8090
 
 WORKDIR /app
 
-# Prefer not to run as root.
-#USER deno
-# — fixing via entrypoint instead. But let's start as root, so can give
-# write access to /deno-dir, so deno can cache stuff.
-# But `exec su -c .... duno` runs as root anyway, why?  See [deno_user]
-# in ./docker-entrypoint.sh .
-# Good work-around / solution: Vendor deps, mount read-only. Problem gone,
-# & more reproducible builds etc.  [vendor_fakeweb_deno_deps]
+# Create a non-root user and set proper permissions
+# The deno user already exists in the base image, so we'll use it
+RUN chown -R deno:deno /deno-dir && \
+    chown -R deno:deno /app
 
-# Ty does this in docker-entrypoint.sh instead — so it'll be enough to just
-# recreate the container, to pick up any changes. Rather than having to
-# rebuild the image:
-# ------
-# Let's do here in the Dockerfile anyway — so there'll be an image available,
-# no mounts needed, when running Prod tests. [fakeweb_mount_nothing]
-# ------
+# Switch to deno user for dependency caching and app compilation
+USER deno
+
 # Cache the dependencies as a layer (the following two steps are re-run only when deps.ts is modified).
 # Ideally cache deps.ts will download and compile _all_ external files used in main.ts.
-COPY app/deps.ts .
+COPY --chown=deno:deno app/deps.ts .
 RUN deno cache deps.ts
 
 # These steps will be re-run upon each file change in your working directory:
-ADD app .
+COPY --chown=deno:deno app .
 # Compile the main app so that it doesn't need to be compiled each startup/entry.
 RUN deno cache main.ts
 # ------
 
 
-# Comment in, if commenting out the above:
-#COPY docker-entrypoint.sh .
-#ENTRYPOINT ["/tini", "--", "docker-entrypoint.sh"]
-
+# The entrypoint script is no longer needed since we're running as deno user directly
 CMD ["run", "--allow-net", "main.ts"]
