@@ -59,6 +59,20 @@ COPY entrypoint.sh /docker-entrypoint.sh
 RUN  chmod ugo+x   /docker-entrypoint.sh
 ENTRYPOINT ["/docker-entrypoint.sh"]
 
+# Build arguments for flexible UID/GID configuration
+ARG USER_UID=1001
+ARG USER_GID=1001
+
+# Create a non-root user to address security vulnerability
+# Use UID 1001 by default to avoid conflicts with common host UIDs
+# The entrypoint script will still handle dynamic user creation when needed
+RUN groupadd --gid ${USER_GID} nodeuser \
+    && useradd --uid ${USER_UID} --gid ${USER_GID} --home-dir /opt/talkyard/server/volumes/gulp-home --create-home nodeuser \
+    && chown -R nodeuser:nodeuser /opt/talkyard/server
+
+# Switch to non-root user for security
+USER nodeuser
+
 # For debugging test code, via `node --debug-brk --inspect=9229`. [8EA02R4]
 EXPOSE 9229
 
