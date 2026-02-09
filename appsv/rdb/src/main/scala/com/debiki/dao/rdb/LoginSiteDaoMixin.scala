@@ -158,9 +158,31 @@ trait LoginSiteDaoMixin extends SiteTransaction {
     val correctHash = user.passwordHash getOrElse {
       throw MemberHasNoPasswordException
     }
-    val okPassword = checkPassword(loginAttempt.password, hash = correctHash)
-    if (!okPassword)
-      throw BadPasswordException
+    
+    // Enhanced password verification with security improvements (CWE-916)
+    val passwordResult = checkPasswordWithUpgrade(loginAttempt.password, correctHash)
+    passwordResult match {
+      case InvalidPassword =>
+        throw BadPasswordException
+      
+      case ValidPasswordNeedsUpgrade =>
+        // Password is valid but hash uses weaker parameters - upgrade it
+        try {
+          val newHash = saltAndHashPassword(loginAttempt.password)
+          val updatedUser = user.copy(passwordHash = Some(newHash))
+          updateUserInclDetails(updatedUser)
+          
+          // Log security event for audit trail
+          System.err.println(s"INFO: Password hash upgraded to stronger parameters for user ${user.id} on successful login")
+        } catch {
+          case ex: Exception =>
+            // Log the error but don't fail the login - the old hash still works
+            System.err.println(s"WARNING: Failed to upgrade password hash for user ${user.id}: ${ex.getMessage}")
+        }
+      
+      case ValidPassword =>
+        // Password is valid and uses strong parameters - no action needed
+    }
 
     MemberLoginGrant(identity = None, user, isNewIdentity = false, isNewMember = false)
   }
