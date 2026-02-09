@@ -197,17 +197,18 @@ export function urlEncodeSearchQuery(query: St): St {
   //          encodeURI won't encode:  ~!@#$&*()=:/,;?+'
 
   var encoded = encodeURI(query);
-  encoded = encoded.replace('#', '%23');
-  encoded = encoded.replace('$', '%24');
-  encoded = encoded.replace('&', '%26');
+  // Use global regex replacements to replace ALL occurrences, not just the first one
+  encoded = encoded.replace(/#/g, '%23');
+  encoded = encoded.replace(/\$/g, '%24');
+  encoded = encoded.replace(/&/g, '%26');
   // '+' means space in a query param and is easier to read. First encode all "real" '+' to %2B,
   // then decode spaces to '+':
-  encoded = encoded.replace('+', '%2B');
-  encoded = encoded.replace('%20', '+');
+  encoded = encoded.replace(/\+/g, '%2B');
+  encoded = encoded.replace(/%20/g, '+');
   // leave , / :  — they're reserved for us to use as delimiters or whatever.
-  encoded = encoded.replace(';', '%3B');
-  encoded = encoded.replace('=', '%3D');
-  encoded = encoded.replace('?', '%3F');
+  encoded = encoded.replace(/;/g, '%3B');
+  encoded = encoded.replace(/=/g, '%3D');
+  encoded = encoded.replace(/\?/g, '%3F');
   // leave @  — it's reserved for us.
   return encoded;
 }
