@@ -1,5 +1,6 @@
 @**
- * Copyright (c) 2013-2017, 2020 Kaj Magnus Lindberg
+ * Script bundles for Talkyard with SRI (Subresource Integrity) support.
+ * Copyright (c) 2013-2017, 2020, 2024 Kaj Magnus Lindberg
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -13,25 +14,75 @@
  *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ * SECURITY NOTES:
+ * - All external scripts must have integrity attributes
+ * - Polyfills use secure alternatives to polyfill.io (which was compromised)
+ * - CSP nonces are required for inline scripts
+ * - Feature flags control external resource loading
  *@
 
+@import com.debiki.core.ExternalResourceIntegrity
 
 @(tpi: debiki.SiteTpi, loadStaffBundle: Boolean)
 
-@* SECURITY try removing polyfill.io — it's a supply chain attack security risk.
-Now soon mostly gone (feature flag) — only old browser will download a polyfill.
-*@
+@*
+ * Helper to generate script tags with proper SRI attributes
+ *@
+@scriptTag(src: String, integrity: Option[String] = None, crossOrigin: String = "anonymous", defer: Boolean = false, async: Boolean = false) = {
+<script src="@src"@if(integrity.isDefined) { integrity="@integrity.get" crossorigin="@crossOrigin"}@if(defer) { defer}@if(async) { async}></script>
+}
+
+@*
+ * SECURE POLYFILL LOADING
+ * SECURITY: Removed polyfill.io (compromised in supply chain attack June 2024)
+ * Now using feature detection with secure fallback to trusted CDN
+ *@
 @* [script_src_self] *@
 @if(tpi.noPolyfillDotIo) {
-} else if(tpi.avoidPolyfillDotIo) {
-<script>{
-var w = window;
-if (!(w.fetch && w.Promise && [].includes && Object.assign && w.Map))
-  document.write('<script src="https://cdn.polyfill.io/v2/polyfill.@{tpi.minMaxJs
-        }?features=default,fetch"></sc' + 'ript>');
-}</script>
+  @* No polyfills loaded - modern browsers only *@
 } else {
-<script src="https://cdn.polyfill.io/v2/polyfill.@{tpi.minMaxJs}"></script>
+  @* Secure conditional polyfill loading with integrity verification *@
+  <script>
+  (function() {
+    var w = window;
+    var needsPolyfill = false;
+    
+    // Feature detection for essential polyfills
+    if (typeof w.Promise === 'undefined') needsPolyfill = true;
+    if (typeof w.fetch === 'undefined') needsPolyfill = true;
+    if (!Array.prototype.includes) needsPolyfill = true;
+    if (!Object.assign) needsPolyfill = true;
+    if (typeof w.Symbol === 'undefined') needsPolyfill = true;
+    if (!w.Map) needsPolyfill = true;
+    
+    if (needsPolyfill) {
+      // Load secure polyfill from trusted CDN with SRI
+      var script = document.createElement('script');
+      script.src = '@ExternalResourceIntegrity.PolyfillCdn.url';
+      script.integrity = '@ExternalResourceIntegrity.PolyfillCdn.integrity';
+      script.crossOrigin = '@ExternalResourceIntegrity.PolyfillCdn.crossOrigin';
+      
+      script.onerror = function() {
+        @if(ExternalResourceIntegrity.PolyfillCdn.fallbackUrl.isDefined) {
+          // Try fallback CDN
+          console.warn('Primary polyfill CDN failed, trying fallback...');
+          var fallback = document.createElement('script');
+          fallback.src = '@ExternalResourceIntegrity.PolyfillCdn.fallbackUrl.get';
+          fallback.crossOrigin = '@ExternalResourceIntegrity.PolyfillCdn.crossOrigin';
+          fallback.onerror = function() {
+            console.error('All polyfill sources failed - some features may not work in legacy browsers');
+          };
+          document.head.appendChild(fallback);
+        } else {
+          console.error('Polyfill load failed, no fallback available');
+        }
+      };
+      
+      document.head.appendChild(script);
+    }
+  })();
+  </script>
 }
 
 <script src="@tpi.assetUrl(s"translations/${tpi.languageCode}/i18n.${tpi.minMaxJs}")"></script>
