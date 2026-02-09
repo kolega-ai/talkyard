@@ -1257,6 +1257,10 @@ class RdbSystemTransaction(
   def deletePersonalDataFromOldAuditLogEntries(): Unit = {
     TESTS_MISSING
 
+    // ENHANCED (CWE-532 Fix): This function now handles tiered data protection
+    // that works with the new anonymization-at-insert approach. It processes
+    // both legacy plaintext data and newly anonymized entries.
+
     // Forget the last octet fairly soon, so won't be possible to identify a
     // unique individial or household via the ip address. But so the ip can still
     // be used to block spammers etc who sign up from the roughly same ip
@@ -1267,34 +1271,95 @@ class RdbSystemTransaction(
     // usually log in?" and if hen doesn't know — account probably hacked.
     // (Gmail asks this sometimes when I haven't enabled 2FA and login from another country)
 
+    // TIER 1: Handle legacy plaintext data and upgrade to hashed format
     PRIVACY; COULD // make x months below configurable
-    val deleteABitStatement = s"""
+    val upgradeLegacyDataStatement = s"""
       update audit_log3 set
-        ip = ip & inet '255.255.255.0',
-        -- ip_randhash_2 =
-        -- browser_id_cookie = hash(browser_id_cookie),
-        -- browser_fingerprint = 0,
-        forgotten = 1
+        -- For legacy plaintext IPs, apply subnet masking to /16
+        ip = case
+          when ip ~ '^[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+$$' 
+            and ip not like '%.0.0' 
+            and ip not like 'H:%'
+            and ip not like '127.0.0.%'
+          then regexp_replace(ip, '^([0-9]+\\.[0-9]+)\\.[0-9]+\\.[0-9]+$$', '\\1.0.0')
+          else ip
+        end,
+        -- For legacy plaintext emails, anonymize local part while preserving domain
+        email_address = case
+          when email_address is not null 
+            and email_address not like 'H:%'
+            and email_address like '%@%'
+            and email_address != '[ANONYMIZED]'
+          then concat('H:',
+                     substring(encode(sha1(concat(?, '_audit_email_legacy_', 
+                                                split_part(email_address, '@', 1))), 'base64'),
+                              1, 16),
+                     '@',
+                     split_part(email_address, '@', 2))
+          when email_address is not null 
+            and email_address not like 'H:%'
+            and email_address != '[ANONYMIZED]'
+          then concat('H:', substring(encode(sha1(concat(?, '_audit_email_full_', email_address)), 'base64'), 1, 20))
+          else email_address
+        end,
+        -- Hash browser cookies if not already hashed
+        browser_id_cookie = case
+          when browser_id_cookie is not null 
+            and browser_id_cookie != ''
+            and browser_id_cookie not like 'H:%'
+          then concat('H:', substring(encode(sha1(concat(?, '_audit_cookie_legacy_', browser_id_cookie)), 'base64'), 1, 16))
+          else browser_id_cookie
+        end,
+        forgotten = greatest(forgotten, 1)
       where
         forgotten = 0 and
-        done_at < ?
+        done_at < ? and
+        (ip ~ '^[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+$$' and ip not like '%.0.0' and ip not like '127.0.0.%'
+         or email_address is not null and email_address not like 'H:%' and email_address != '[ANONYMIZED]'
+         or browser_id_cookie is not null and browser_id_cookie not like 'H:%' and browser_id_cookie != '')
       """
 
-    runUpdate(deleteABitStatement, List(now.minusMonths(SomeMonthsAgo).asTimestamp))
+    // Need to provide salt parameters for the SQL placeholders
+    val auditSalt = "talkyard_audit_salt_2025_cwe532_fix" // Use same fixed salt as anonymization functions
+    runUpdate(upgradeLegacyDataStatement, List(
+      auditSalt, auditSalt, auditSalt, now.minusMonths(SomeMonthsAgo).asTimestamp))
 
+    // TIER 2: Further anonymize older entries (original behavior enhanced)
     PRIVACY; COULD // make x years below configurable
     // Now no need to remember region and city any longer. (But remember which country.)
     val deleteMoreStatement = s"""
       update audit_log3 set
+        -- Further mask IP addresses (original inet masking for compatibility)
         ip = ip & inet '255.255.0.0',
+        -- Fully hash email addresses (remove domain preservation)
+        email_address = case
+          when email_address like 'H:%@%'
+          then concat('H:', substring(encode(sha1(concat(?, '_audit_email_forgotten_', email_address)), 'base64'), 1, 12))
+          else email_address
+        end,
+        -- Remove geographic data
         region = null,
         city = null,
+        -- Mark as more forgotten
         forgotten = 2
       where
         forgotten = 1 and
         done_at < ?
       """
-    runUpdate(deleteMoreStatement, List(now.minusYears(SomeYearsAgo).asTimestamp))
+    runUpdate(deleteMoreStatement, List(auditSalt, now.minusYears(SomeYearsAgo).asTimestamp))
+
+    // TIER 3: Final cleanup - remove remaining PII for very old entries  
+    val finalCleanupStatement = s"""
+      update audit_log3 set
+        email_address = null,
+        ip = '127.0.0.2',  -- Use BrowserIdData.Forgotten IP  
+        browser_id_cookie = null,
+        browser_fingerprint = 0
+      where
+        forgotten = 2 and
+        done_at < ?
+      """
+    runUpdate(finalCleanupStatement, List(now.minusYears(SomeYearsAgo * 2).asTimestamp))
   }
 
 
