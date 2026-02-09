@@ -183,12 +183,14 @@ object Email {   RENAME // to EmailOut?
 
 
   /** Used in the From SMTP header, and in unsubscription urls.
+    * Uses 96 bits of entropy with base64url encoding for guaranteed 16 characters.
     */
-  def generateRandomId(): String = nextRandomString() take 16
+  def generateRandomId(): String = nextRandomString(96, base36 = false, base64UrlSafe = true)
 
-  /** Used in reset password emails, email verification urls, link accounts urls..
+  /** Used in reset password emails, email verification urls, link accounts urls.
+    * Uses 120 bits of entropy with base64url encoding for guaranteed 20 characters.
     */
-  def generateSecret(): St = nextRandomString() take 20
+  def generateSecret(): St = nextRandomString(120, base36 = false, base64UrlSafe = true)
 }
 
 
@@ -226,7 +228,7 @@ case class Email(
   // (sentFrom.isEmpty and sentOn.isDefined is ok, for backw compat.)
 
   dieIf(secretValue.exists(v => v.length < 20 || 50 < v.length), "TyE5MIRF26")
-  dieIf(secretValue.exists(!_.isAlNum), "TyE7S45MIRF9")
+  dieIf(secretValue.exists(!_.matches("[A-Za-z0-9_-]*")), "TyE7S45MIRF9")
 
   dieIf(secretValue.isDefined && secretStatus.isEmpty, "TyE7L3MSEGJ3")
   // (However, a secret status without a value, is fine, for backw compat
