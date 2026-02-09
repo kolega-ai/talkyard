@@ -18,7 +18,8 @@
 package talkyard.server.summaryemails
 
 import com.debiki.core._
-import debiki.EdHttp._
+import debiki.{EdHttp, RateLimits}
+import EdHttp._
 import talkyard.server.{TyContext, TyController}
 import talkyard.server.http._
 import javax.inject.Inject
@@ -65,12 +66,13 @@ class UnsubFromSummariesController @Inject()(cc: ControllerComponents, edContext
       throwForbidden( "TyE5JGKW0", s"Bad unsubscription link: $err  [TyEUNSBLN01]")
     }
     CSP_MISSING
-    Ok(views.html.summaryemails.unsubFromSummariesPage(emailId, emailAddress = email.sentTo))
+    Ok(views.html.summaryemails.unsubFromSummariesPage(emailId, emailAddress = email.sentTo, 
+        xsrfToken = request.xsrfToken.value))
   }
 
 
   def handleForm: Action[JsonOrFormDataBody] =
-        ExceptionAction(new JsonOrFormDataBodyParser(executionContext, cc).parser(maxBytes = 200)) {
+        JsonOrFormDataPostAction(RateLimits.ResetPassword, maxBytes = 200, allowAnyone = true) {
           request =>
 
     val emailId = request.body.getFirst(EmailIdInpName) getOrElse throwParamMissing(
