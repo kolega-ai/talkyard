@@ -15,7 +15,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *@
 
-@(emailId: String, emailAddress: String)
+@(emailId: String, emailAddress: String, xsrfToken: String)
 
 @import talkyard.server.summaryemails.{UnsubFromSummariesController => UC}
 @import UC.EmailIdInpName
@@ -60,6 +60,7 @@ input[type="radio"] {
 <p>Email address: <code>@emailAddress</code></p>
 
 <form accept-charset="UTF-8" method="post" class="s_UnsubSum">
+<input name='dw-fi-xsrf' type='hidden' value='@xsrfToken'>
 <input type="hidden" name="@EmailIdInpName" value="@emailId">
 <div class="s_UnsubSum_Inps">
 <label><input type="radio" name="@WhatInpName" value="@{UC.InpValUnsub}" checked="checked">Yes, unsubscribe</label><br>
