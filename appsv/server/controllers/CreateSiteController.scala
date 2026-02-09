@@ -35,8 +35,13 @@ import scala.util.Try
 
 /** Creates new empty sites, for forums, blogs or embedded comments.
   */
-class CreateSiteController @Inject()(cc: ControllerComponents, edContext: TyContext)
-  extends TyController(cc, edContext) {
+class CreateSiteController @Inject()(
+  cc: ControllerComponents, 
+  edContext: TyContext,
+  securityService: talkyard.server.security.SiteCreationSecurityService,
+  enhancedRateLimiter: talkyard.server.security.EnhancedSiteCreationRateLimiter,
+  auditLogger: talkyard.server.security.SecurityAuditLogger
+) extends TyController(cc, edContext) {
 
   import context.security._
   import context.globals
@@ -105,6 +110,8 @@ class CreateSiteController @Inject()(cc: ControllerComponents, edContext: TyCont
 
   private def createSiteImpl(request: JsonPostRequest, isPubApi: Bo): p_Result = {
     import JsonUtils.{parseBo, parseOptBo, parseOptSt, parseSt, asJsObject}
+    import scala.concurrent.Await
+    import scala.concurrent.duration._
 
     val isTestSiteOkayToDelete = parseOptBo(request.body, "testSiteOkDelete") is true
     throwIfMayNotCreateSite(request, isTestSiteOkayToDelete)
@@ -119,8 +126,90 @@ class CreateSiteController @Inject()(cc: ControllerComponents, edContext: TyCont
     val anyEmbeddingSiteAddress = parseOptSt(body, "embeddingSiteAddress").trimNoneIfBlank
     val organizationName = parseSt(body, "organizationName").trim
     val makePublic = parseOptBo(body, "makePublic")
+    
+    // SECURITY ENHANCEMENT: Extract composite identity for advanced tracking
+    val ownerEmailOpt = if (isPubApi) parseOptSt(body, "ownerEmailAddr").trimNoneIfBlank else None
+    val compositeIdentity = securityService.extractCompositeIdentity(request.request, ownerEmailOpt)
+    
+    // SECURITY ENHANCEMENT: Secured test bypass mechanism
+    val validTestBypass = securityService.SecureTestBypass.validateBypass(request.request, compositeIdentity)
+    
+    // Legacy bypass support (deprecated, will be removed)
     val okForbiddenPassword = hasOkForbiddenPassword(request)
     val okE2ePassword = hasOkE2eTestPassword(request.request)
+    
+    // If no valid bypass, perform enhanced security checks
+    if (!validTestBypass && !okForbiddenPassword && !okE2ePassword) {
+      
+      // SECURITY ENHANCEMENT: IP risk assessment
+      val ipRiskAssessment = try {
+        Await.result(securityService.assessIpRisk(compositeIdentity.ipAddress), 5.seconds)
+      } catch {
+        case _: Exception => 
+          // If risk assessment fails, assume medium risk to be safe
+          securityService.IpRiskAssessment(0.5, Seq("Risk assessment unavailable"), true)
+      }
+      
+      // SECURITY ENHANCEMENT: Enhanced rate limiting
+      val rateLimitResult = try {
+        Await.result(enhancedRateLimiter.checkRateLimits(compositeIdentity, ipRiskAssessment.isHighRisk), 5.seconds)
+      } catch {
+        case ex: Exception =>
+          // If rate limiter fails, fall back to blocking to be safe
+          auditLogger.logCriticalSecurityEvent(
+            event = "RATE_LIMITER_FAILURE",
+            ip = compositeIdentity.ipAddress.value,
+            details = Map("error" -> ex.getMessage)
+          )
+          throwServiceUnavailable("TyESEC001", "Security check temporarily unavailable")
+      }
+      
+      rateLimitResult match {
+        case talkyard.server.security.RateLimitCheckResult.Exceeded(violatedKey, count, limit, retryAfter, _) =>
+          auditLogger.logSecurityEvent(
+            event = "SITE_CREATION_RATE_LIMITED",
+            ip = compositeIdentity.ipAddress.value,
+            severity = talkyard.server.security.SecuritySeverity.Warning,
+            details = Map(
+              "violatedKey" -> violatedKey.description,
+              "count" -> count.toString,
+              "limit" -> limit.toString
+            )
+          )
+          
+          throwForbidden("TyESEC002", s"Too many site creation attempts. Please try again in ${retryAfter} seconds.")
+          
+        case talkyard.server.security.RateLimitCheckResult.Allowed(_, _) =>
+          // Continue with site creation
+      }
+      
+      // SECURITY ENHANCEMENT: Additional checks for high-risk IPs
+      if (ipRiskAssessment.isHighRisk && ipRiskAssessment.score > 0.7) {
+        auditLogger.logSecurityEvent(
+          event = "HIGH_RISK_SITE_CREATION_BLOCKED",
+          ip = compositeIdentity.ipAddress.value,
+          severity = talkyard.server.security.SecuritySeverity.Warning,
+          details = Map(
+            "riskScore" -> ipRiskAssessment.score.toString,
+            "riskFactors" -> ipRiskAssessment.factors.mkString(", ")
+          )
+        )
+        
+        throwForbidden("TyESEC003", "Site creation temporarily restricted. Please try again later or contact support.")
+      }
+    } else {
+      // Log bypass usage for audit
+      val bypassType = if (validTestBypass) "secure_test_bypass" 
+                      else if (okE2ePassword) "legacy_e2e_password"
+                      else "forbidden_password"
+                      
+      auditLogger.logSecurityEvent(
+        event = "SITE_CREATION_SECURITY_BYPASSED",
+        ip = compositeIdentity.ipAddress.value,
+        severity = talkyard.server.security.SecuritySeverity.Info,
+        details = Map("bypassType" -> bypassType)
+      )
+    }
 
     // Let's [remove_not_allowed_feature_flags], rather than replying Error. Otherwise,
     // a typo in create-site external code, could totally prevent creation of new sites.
@@ -242,7 +331,7 @@ class CreateSiteController @Inject()(cc: ControllerComponents, edContext: TyCont
             organizationName = organizationName,
             makePublic = makePublic,
             isTestSiteOkayToDelete = isTestSiteOkayToDelete,
-            skipMaxSitesCheck = okE2ePassword || okForbiddenPassword,
+            skipMaxSitesCheck = validTestBypass || okE2ePassword || okForbiddenPassword,
             createdFromSiteId = Some(request.siteId),
             anySysTx = Some(sysTx))
 
@@ -294,6 +383,35 @@ class CreateSiteController @Inject()(cc: ControllerComponents, edContext: TyCont
         }
 
         staleStuff.clearStaleStuffInMemory(newSiteDao)
+        
+        // SECURITY ENHANCEMENT: Record successful site creation for rate limiting
+        if (!validTestBypass && !okForbiddenPassword && !okE2ePassword) {
+          try {
+            Await.result(enhancedRateLimiter.recordSiteCreation(compositeIdentity), 5.seconds)
+          } catch {
+            case ex: Exception =>
+              // Log but don't fail the request if recording fails
+              auditLogger.logSecurityEvent(
+                event = "SITE_CREATION_RECORDING_FAILED",
+                ip = compositeIdentity.ipAddress.value,
+                severity = talkyard.server.security.SecuritySeverity.Warning,
+                details = Map("error" -> ex.getMessage)
+              )
+          }
+        }
+        
+        // SECURITY ENHANCEMENT: Log successful site creation
+        auditLogger.logSecurityEvent(
+          event = "SITE_CREATION_SUCCESS",
+          ip = compositeIdentity.ipAddress.value,
+          severity = talkyard.server.security.SecuritySeverity.Info,
+          details = Map(
+            "siteId" -> newSite.id.toString,
+            "hostname" -> hostname,
+            "organizationName" -> organizationName,
+            "bypassUsed" -> (validTestBypass || okForbiddenPassword || okE2ePassword).toString
+          )
+        )
 
         if (!isTestSiteOkayToDelete) {
           val now = globals.now()
