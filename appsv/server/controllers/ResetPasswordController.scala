@@ -35,7 +35,7 @@ class ResetPasswordController @Inject()(cc: ControllerComponents, edContext: TyC
   extends TyController(cc, edContext) with TyLogging {
 
   import context.globals
-  import context.security.createSessionIdAndXsrfToken
+  import context.security.{createSessionIdAndXsrfToken, SecureCookie, DiscardingSecureCookie}
 
 
   def start = GetActionAllowAnyone { _ =>
@@ -204,14 +204,26 @@ class ResetPasswordController @Inject()(cc: ControllerComponents, edContext: TyC
         GetActionAllowAnyoneRateLimited(RateLimits.NewPasswordPage) { request =>
     // Tested here: TyT6HJ2RD1
     // (Note that we don't login for real here — we don't set any session cookie.)
+    
+    // SECURITY FIX: Immediately invalidate token to prevent reuse attacks
+    // The token is now single-use only - no window for attackers to reuse it
     val loginGrant = loginByEmailOrThrow(resetPasswordEmailId, request,
-      // So the request to handleNewPasswordForm() below works:
-      mayLoginAgain = true)
+      mayLoginAgain = false)  // CHANGED: Invalidate token immediately
+    
+    // Generate secure nonce for CSRF-like protection of the form submission
+    val resetNonce = java.util.UUID.randomUUID().toString
+    
     CSP_MISSING
     Ok(views.html.resetpassword.chooseNewPassword(
       SiteTpi(request),
       user = loginGrant.user,
       anyResetPasswordEmailId = resetPasswordEmailId))
+      // Store validated state in session to allow form submission without token revalidation
+      .withSession(request.session + 
+        ("resetPasswordUserId" -> loginGrant.user.id.toString) +
+        ("resetPasswordNonce" -> resetNonce) +
+        ("resetPasswordValidUntil" -> (globals.now().millis + 15 * 60 * 1000).toString)) // 15 min expiry
+      .withCookies(SecureCookie("resetPasswordNonce", resetNonce, httpOnly = true))
   }
 
 
@@ -221,11 +233,42 @@ class ResetPasswordController @Inject()(cc: ControllerComponents, edContext: TyC
     import request.dao
     val newPassword = request.body.getOrThrowBadReq("newPassword")
 
-    val loginGrant = loginByEmailOrThrow(anyResetPasswordEmailId, request,
-          // So someone who might e.g. see the reset-pwd url in some old log file or wherever,
-          // will be unable to reuse it:
-          mayLoginAgain = false)
-    dao.changePasswordCheckStrongEnough(loginGrant.user.id, newPassword)
+    // SECURITY FIX: Use session state instead of revalidating the already-consumed token
+    // This prevents the need to reuse tokens and closes the attack window
+    val sessionUserId = request.session.get("resetPasswordUserId") getOrElse {
+      throwForbidden("TyEPWRST_NOSESS", "Password reset session not found. Please request a new reset link.")
+    }
+    val sessionNonce = request.session.get("resetPasswordNonce") getOrElse {
+      throwForbidden("TyEPWRST_NONONCE", "Password reset session invalid. Please request a new reset link.")
+    }
+    val validUntilStr = request.session.get("resetPasswordValidUntil") getOrElse {
+      throwForbidden("TyEPWRST_NOEXP", "Password reset session invalid. Please request a new reset link.")
+    }
+
+    // Validate session hasn't expired (15 minute window)
+    val validUntil = validUntilStr.toLongOption getOrElse {
+      throwForbidden("TyEPWRST_BADEXP", "Password reset session invalid. Please request a new reset link.")
+    }
+    if (globals.now().millis > validUntil) {
+      throwForbidden("TyEPWRST_EXPIRED", "Password reset session expired. Please request a new reset link.")
+    }
+
+    // Validate nonce matches what we stored (CSRF-like protection)
+    val cookieNonce = request.cookies.get("resetPasswordNonce").map(_.value) getOrElse {
+      throwForbidden("TyEPWRST_NOCNONCE", "Password reset session invalid. Please request a new reset link.")
+    }
+    if (sessionNonce != cookieNonce) {
+      throwForbidden("TyEPWRST_BADNONCE", "Password reset session invalid. Please request a new reset link.")
+    }
+
+    // Load the user from the validated session state
+    val userId = sessionUserId.toIntOption getOrElse {
+      throwForbidden("TyEPWRST_BADUID", "Password reset session invalid. Please request a new reset link.")  
+    }
+    val user = dao.loadTheUserInclDetailsById(userId)
+    
+    // Validate password strength
+    dao.changePasswordCheckStrongEnough(user.id, newPassword)
 
     // Expire all old sessions, so in case pat is resetting hans password
     // because han suspects a hacker has logged in to hans account elsewhere,
@@ -240,19 +283,22 @@ class ResetPasswordController @Inject()(cc: ControllerComponents, edContext: TyC
     // So, there needs to be a do-later task saved in the db, in case pat disconnects
     // abruptly.
     //
-    val terminatedSessions = dao.terminateSessions(forPatId = loginGrant.user.id, all = true)
+    val terminatedSessions = dao.terminateSessions(forPatId = user.id, all = true)
 
     UX; COULD // reply: """Done. You're now logged out from  ${terminatedSessions.length - 1 ?}
     // other sessions."""  (-1 depends on if logged in on the current device or not.)
 
     // Log the user in and show password changed message.
-    dao.pubSub.userIsActive(request.siteId, loginGrant.user, request.theBrowserIdData)
-    val (_, _, sidAndXsrfCookies) = createSessionIdAndXsrfToken(request, loginGrant.user.id)
+    dao.pubSub.userIsActive(request.siteId, user, request.theBrowserIdData)
+    val (_, _, sidAndXsrfCookies) = createSessionIdAndXsrfToken(request, user.id)
     val newSessionCookies = sidAndXsrfCookies
 
     CSP_MISSING
     Ok(views.html.resetpassword.passwordHasBeenChanged(SiteTpi(request)))
           .withCookies(newSessionCookies: _*)
+          // SECURITY: Clear the password reset session state to prevent replay attacks
+          .withSession(request.session - "resetPasswordUserId" - "resetPasswordNonce" - "resetPasswordValidUntil")
+          .discardingCookies(DiscardingSecureCookie("resetPasswordNonce"))
   }
 
 
