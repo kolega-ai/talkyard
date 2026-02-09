@@ -1,5 +1,5 @@
-# Configures a server that uses about 1.5G RAM, and to which you can connect a debugger,
-# and some passwords.
+# Configures a server that uses about 1.5G RAM, and to which you can connect a debugger.
+# Environment variables are used for all sensitive configuration values.
 
 version: '3.7'
 services:
@@ -11,12 +11,12 @@ services:
     environment:
       PLAY_HEAP_MEMORY_MB: 500
       CREATE_SITE_HOSTNAME: 'localhost'
-      E2E_TEST_PASSWORD: 'public'
-      FORBIDDEN_PASSWORD: 'public'
-      PLAY_SECRET_KEY: 'public-03xP4K463krs4397j923fuyRKB5sek4928674luh49rka5692kj9089'
-      POSTGRES_PASSWORD: 'public'
-      TY_SYSMAINT_API_SECRET: 'test_sysmaint_api_secret'
-      TY_EMAIL_WEBHOOKS_API_SECRET: 'publicEmailWebhooksApiTestSecret'
+      E2E_TEST_PASSWORD: '${E2E_TEST_PASSWORD:-public}'
+      FORBIDDEN_PASSWORD: '${FORBIDDEN_PASSWORD:-public}'
+      PLAY_SECRET_KEY: '${PLAY_SECRET_KEY:-public-test-key-not-for-production}'
+      POSTGRES_PASSWORD: '${POSTGRES_PASSWORD:-public}'
+      TY_SYSMAINT_API_SECRET: '${TY_SYSMAINT_API_SECRET:-test_sysmaint_api_secret}'
+      TY_EMAIL_WEBHOOKS_API_SECRET: '${TY_EMAIL_WEBHOOKS_API_SECRET:-test_email_webhooks_secret}'
       TY_FEATURE_FLAGS: 'ffMayPatchSite'
       MAY_FAST_FORWARD_TIME: 'true'
 
@@ -31,7 +31,7 @@ services:
   rdb:
     #mem_limit: 140M
     environment:
-      POSTGRES_PASSWORD: 'public'
+      POSTGRES_PASSWORD: '${POSTGRES_PASSWORD:-public}'
 
   # A fake external server, for e2e tests, when the Ty server sends its own HTTP
   # requests to external things.
