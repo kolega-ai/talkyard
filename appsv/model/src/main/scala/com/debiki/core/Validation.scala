@@ -234,9 +234,6 @@ object Validation {  // rename // to Check, so:  Check.ifBadEmail( ...)  — loo
 
   def findSsoIdProblem(ssoId: String): Option[ErrorMessage] = {
     findExtIdOrSsoIdProblemImpl(ssoId, isSsoId = true)
-    if (ssoId.trim != ssoId)
-      return Some("Single Sign-On id start or ends with blanks [TyESSOBLNKS")
-    None
   }
 
   private def findExtIdOrSsoIdProblemImpl(extId: String, isSsoId: Boolean): Option[ErrorMessage] = {
@@ -245,11 +242,107 @@ object Validation {  // rename // to Check, so:  Check.ifBadEmail( ...)  — loo
     if (extId.length > MaxExtIdLength) return Some(
       s"Too long $what, longer than $MaxExtIdLength chars: '$extId' [TyEEXTIDLNG]")
 
-    //For now: (there's a db constraint)
+    // Check for whitespace at start/end
+    if (extId.trim != extId) return Some(
+      s"The $what starts or ends with whitespace: '$extId' [TyEEXTIDBLNK]")
+
+    // Validate character content - matches db constraint: ^[[:graph:]]([[:graph:] ]*[[:graph:]])?$
+    // This ensures only printable non-space characters plus internal spaces are allowed
+    if (!isValidExtIdFormat(extId)) return Some(
+      s"The $what contains invalid characters. Only letters, numbers, punctuation and internal spaces allowed: '$extId' [TyEEXTIDCHAR]")
+
     None
-    // \p{Graph}
-    // val p = java.util.regex.Pattern.compile("\\w+", java.util.regex.Pattern.UNICODE_CHARACTER_CLASS);
-    // db:   ~ '^[[:graph:]]([[:graph:] ]*[[:graph:]])?$' and length(text) between 1 and 128;
+  }
+
+  /** Validates external ID format for security and database constraint compliance.
+    * 
+    * Database constraint: ^[[:graph:]]([[:graph:] ]*[[:graph:]])?$
+    * This implementation adds security restrictions to prevent injection attacks
+    * while maintaining compatibility with the database constraint.
+    * 
+    * Security restrictions:
+    * - Blocks HTML/XML special characters: < > 
+    * - Blocks SQL injection characters: ' " ; 
+    * - Blocks URL indicators: :// (to prevent SSRF/tracking)
+    * - Blocks control characters and non-printables
+    * - Allows alphanumeric, common punctuation, and internal spaces
+    */
+  private def isValidExtIdFormat(extId: String): Boolean = {
+    if (extId.isEmpty) return false
+    
+    // Check for dangerous patterns that could enable attacks
+    if (containsDangerousPatterns(extId)) return false
+    
+    // Apply database constraint: first and last must be printable non-space
+    // Middle can contain printable non-space characters or single spaces
+    if (extId.length == 1) {
+      return isAllowedGraphicChar(extId.head)
+    }
+    
+    val first = extId.head
+    val last = extId.last
+    if (!isAllowedGraphicChar(first) || !isAllowedGraphicChar(last)) {
+      return false
+    }
+    
+    // Check middle characters - allow spaces but validate other characters
+    val middle = extId.slice(1, extId.length - 1)
+    for (c <- middle) {
+      if (c != ' ' && !isAllowedGraphicChar(c)) {
+        return false
+      }
+    }
+    
+    true
+  }
+
+  /** Checks if a character is an allowed graphic character for external IDs.
+    * Excludes dangerous HTML/SQL characters while allowing common punctuation.
+    */
+  private def isAllowedGraphicChar(c: Char): Boolean = {
+    // Must be printable and not a space
+    if (!c.isGraphic) return false
+    
+    // Block HTML/XML dangerous characters
+    if (c == '<' || c == '>') return false
+    
+    // Block SQL injection characters
+    if (c == '\'' || c == '"' || c == ';') return false
+    
+    // Block potential URL scheme indicators and other risky chars
+    if (c == '&' || c == '|' || c == '\\' || c == '`') return false
+    
+    // Allow everything else that's graphic (letters, numbers, common punctuation)
+    true
+  }
+
+  /** Checks for dangerous patterns that could enable injection attacks. */
+  private def containsDangerousPatterns(extId: String): Boolean = {
+    val lower = extId.toLowerCase
+    
+    // Check for script-like patterns
+    if (lower.contains("script") && (lower.contains("<") || lower.contains(">"))) return true
+    if (lower.contains("javascript:")) return true
+    if (lower.contains("vbscript:")) return true
+    if (lower.contains("data:")) return true
+    
+    // Check for SQL injection patterns  
+    if (lower.contains("drop table") || lower.contains("delete from")) return true
+    if (lower.contains("insert into") || lower.contains("update ")) return true
+    if (lower.contains("union select")) return true
+    if (lower.matches(".*'\\s*;\\s*--.*")) return true // SQL comment injection
+    if (lower.matches(".*'\\s+(or|and)\\s+[\\w'\"=\\s]*")) return true // Boolean injection
+    
+    // Check for URL patterns (could be used for tracking/SSRF)
+    if (lower.contains("://")) return true
+    
+    // Check for path traversal
+    if (extId.contains("../") || extId.contains("..\\")) return true
+    
+    // Check for HTML event handlers
+    if (lower.matches(".*on\\w+\\s*=.*")) return true
+    
+    false
   }
 
 
