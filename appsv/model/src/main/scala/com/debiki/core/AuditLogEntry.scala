@@ -249,8 +249,10 @@ case class AuditLogEntry(
     requireIf(didWhat == T.NewPage, pageId.isDefined && uniquePostId.isDefined, "EdE5PFK2")
     requireIf(didWhat == T.DeletePage || didWhat == T.UndeletePage,
                 pageId.isDefined && uniquePostId.isEmpty, "EdE7ZXCY4")
-    // COULD check uploaded file hash-path-suffix regex, see talkyard.server.uploads.UploadsDao.
+    // Validate uploadHashPathSuffix to prevent path traversal attacks
     require(!uploadHashPathSuffix.exists(_.trim.isEmpty), "DwE0PMF2")
+    require(uploadHashPathSuffix.forall(AuditLogEntry.isValidHashPathSuffix),
+      "Invalid uploadHashPathSuffix format - potential path traversal [TyEHPSINVALID]")
     require(!uploadFileName.exists(_.trim.isEmpty), "DwE7UPM1")
     require(!sizeBytes.exists(_ < 0), "DwE7UMF4")
     require(targetPostNr.isDefined == targetUniquePostId.isDefined, "DwE4QU38")
@@ -264,5 +266,30 @@ case class AuditLogEntry(
 object AuditLogEntry {
   val UnassignedId = 0
   val FirstId = 1
+
+  /** Hash path suffix format: "0/a/bc/xyz123.jpg" or "video/12/a/bc/xyz.mp4"
+    * Synced with UploadsDao.HashPathSuffixRegex - if updating, update both!
+    */
+  private val HashPathSuffixRegex = 
+    """^(video/)?[0-9][0-9]?/[a-z0-9]/[a-z0-9]{2}/[a-z0-9]+\.[a-z0-9]+$""".r
+  
+  /** Old format for backwards compatibility: "a/b/xyz123.jpg"
+    * Synced with UploadsDao.OldHashPathSuffixRegex - if updating, update both!
+    */
+  private val OldHashPathSuffixRegex = 
+    """^[a-z0-9]/[a-z0-9]/[a-z0-9]+\.[a-z0-9]+$""".r
+
+  /** Validates upload hash path suffix to prevent path traversal attacks.
+    * Returns true if the path is valid and safe to use.
+    */
+  def isValidHashPathSuffix(path: String): Boolean = {
+    // Defense in depth: explicit checks before regex validation
+    path.nonEmpty &&
+    !path.contains("..") &&           // No path traversal
+    !path.startsWith("/") &&          // No absolute paths
+    !path.contains('\u0000') &&      // No null byte injection
+    !path.contains("\\") &&           // No Windows-style paths
+    (HashPathSuffixRegex.matches(path) || OldHashPathSuffixRegex.matches(path))
+  }
 }
 
