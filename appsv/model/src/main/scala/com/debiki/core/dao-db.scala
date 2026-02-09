@@ -102,23 +102,61 @@ object DbDao {
     case Some(message) => s", details: $message"
   }
 
-  /** So we know which algorithm was used when hashing a password. */
+  /** Password hash algorithm prefixes */
   val ScryptPrefix = "scrypt:"
-
-  /** Automatic test might use cleartext passwords. */
+  val ScryptV2Prefix = "scrypt2:"
+  
+  /** Test-only cleartext passwords - ONLY enabled in test environments */
   val CleartextPrefix = "cleartext:"
 
-  // This could be moved to debiki-server, so the dao won't have this
-  // dependency on the password hashing algorithm? Just have the dao module load the
-  // password hash, but don't actually check the hash inside the dao.
-  def checkPassword(plainTextPassword: String, hash: String) = {
-    if (hash.startsWith(ScryptPrefix)) {
+  // SCrypt parameters - upgraded to OWASP 2024 recommendations
+  private val CurrentScryptN = 131072  // 2^17 (upgraded from 2^16)
+  private val CurrentScryptR = 8
+  private val CurrentScryptP = 1
+  private val MinimumScryptN = 65536   // 2^16 (minimum for legacy hash acceptance)
+
+  sealed trait PasswordCheckResult
+  case object ValidPassword extends PasswordCheckResult
+  case object InvalidPassword extends PasswordCheckResult
+  case object ValidPasswordNeedsUpgrade extends PasswordCheckResult
+
+  /**
+   * Check password against hash with improved security and upgrade detection.
+   * Addresses CWE-916 by using stronger parameters and eliminating timing vulnerabilities.
+   */
+  def checkPasswordWithUpgrade(plainTextPassword: String, hash: String): PasswordCheckResult = {
+    if (hash.startsWith(ScryptV2Prefix)) {
+      // New format with stronger parameters
+      val hashNoPrefix = hash.drop(ScryptV2Prefix.length)
+      if (SCryptUtil.check(plainTextPassword, hashNoPrefix)) ValidPassword
+      else InvalidPassword
+    }
+    else if (hash.startsWith(ScryptPrefix)) {
+      // Legacy format - needs upgrade but still acceptable
       val hashNoPrefix = hash.drop(ScryptPrefix.length)
-      SCryptUtil.check(plainTextPassword, hashNoPrefix)
+      if (SCryptUtil.check(plainTextPassword, hashNoPrefix)) {
+        // Password is valid but hash uses weaker parameters - signal upgrade needed
+        ValidPasswordNeedsUpgrade
+      } else {
+        InvalidPassword
+      }
     }
     else if (hash.startsWith(CleartextPrefix)) {
-      val cleartext = hash.drop(CleartextPrefix.length)
-      plainTextPassword == cleartext
+      // SECURITY: Only allow cleartext in test environments
+      // Check environment to prevent accidental production use
+      val isTestEnvironment = sys.env.getOrElse("ENVIRONMENT", "production") == "test" ||
+                             sys.props.get("testing").contains("true")
+      
+      if (!isTestEnvironment) {
+        // Log security incident - cleartext password in production
+        System.err.println(s"SECURITY WARNING: Cleartext password attempted in production environment")
+        InvalidPassword
+      } else {
+        val cleartext = hash.drop(CleartextPrefix.length)
+        // Use constant-time comparison to prevent timing attacks
+        if (constantTimeStringEquals(plainTextPassword, cleartext)) ValidPassword
+        else InvalidPassword
+      }
     }
     else if (!hash.contains(':')) {
       die("EsE2PUY8", s"No password algorithm prefix in password hash")
@@ -129,19 +167,89 @@ object DbDao {
     }
   }
 
+  /**
+   * Enhanced password check with security improvements.
+   * Maintains backward compatibility while addressing CWE-916 vulnerabilities.
+   */
+  def checkPassword(plainTextPassword: String, hash: String): Boolean = {
+    if (hash.startsWith(ScryptV2Prefix)) {
+      // New format with stronger parameters
+      val hashNoPrefix = hash.drop(ScryptV2Prefix.length)
+      SCryptUtil.check(plainTextPassword, hashNoPrefix)
+    }
+    else if (hash.startsWith(ScryptPrefix)) {
+      // Legacy format - still acceptable for compatibility
+      val hashNoPrefix = hash.drop(ScryptPrefix.length)
+      SCryptUtil.check(plainTextPassword, hashNoPrefix)
+    }
+    else if (hash.startsWith(CleartextPrefix)) {
+      // SECURITY: Only allow cleartext in test environments
+      val isTestEnvironment = sys.env.getOrElse("ENVIRONMENT", "production") == "test" ||
+                             sys.props.get("testing").contains("true")
+      
+      if (!isTestEnvironment) {
+        // Log security incident and reject
+        System.err.println(s"SECURITY WARNING: Cleartext password attempted in production environment")
+        false
+      } else {
+        val cleartext = hash.drop(CleartextPrefix.length)
+        // Use constant-time comparison to prevent timing attacks
+        constantTimeStringEquals(plainTextPassword, cleartext)
+      }
+    }
+    else if (!hash.contains(':')) {
+      die("EsE2PUY8", s"No password algorithm prefix in password hash")
+    }
+    else {
+      val prefix = hash.takeWhile(_ != ':')
+      die("EsE4PKUY1", s"Unknown password algorithm: '$prefix'")
+    }
+  }
+
+  /**
+   * Create new password hash with strengthened SCrypt parameters.
+   * Uses OWASP 2024 recommended parameters: n=131072, r=8, p=1
+   */
   def saltAndHashPassword(plainTextPassword: String): String = {
     // Notes:
     // 1) In Dockerfile [30PUK42] Java has been configured to use /dev/urandom — otherwise,
     // the first call to scrypt() here might block for up to 30 minutes, when scrypt
     // blocks when reading for /dev/random, which waits for "enough entropy" (but urandom is fine,
     // see the Dockerfile).
-    // 2) This is what I was using for bcrypt previously: val logRounds = 13 // 10 is the default.
-    // Now, scrypt though, with: n = 2^17 = 131072, r = 8, p = 1  -- no, use 2^16 = 65536
-    // (2^14 was recommended in 2009 for web apps, and 2^20 for files
-    // if waiting 5 seconds was okay. 2^17 is overkill I would think.)
-    // Move to the server module? [mv_scrypt_2_srv]
-    val hash = SCryptUtil.scrypt(plainTextPassword, 65536, 8, 1)
+    // 2) Upgraded parameters from n=65536 to n=131072 (2^17) per OWASP 2024 recommendations
+    // 3) This provides 128MB memory usage vs previous 64MB for better resistance to attacks
+    val hash = SCryptUtil.scrypt(plainTextPassword, CurrentScryptN, CurrentScryptR, CurrentScryptP)
+    s"$ScryptV2Prefix$hash"
+  }
+
+  /**
+   * Create legacy-format hash for testing/compatibility purposes.
+   * Uses the older n=65536 parameters but still secure enough.
+   */
+  def saltAndHashPasswordLegacy(plainTextPassword: String): String = {
+    val hash = SCryptUtil.scrypt(plainTextPassword, MinimumScryptN, CurrentScryptR, CurrentScryptP)
     s"$ScryptPrefix$hash"
+  }
+
+  /**
+   * Check if a hash uses weaker parameters and should be upgraded.
+   */
+  def hashNeedsUpgrade(hash: String): Boolean = {
+    hash.startsWith(ScryptPrefix) || hash.startsWith(CleartextPrefix)
+  }
+
+  /**
+   * Constant-time string comparison to prevent timing attacks.
+   * Uses the same algorithm as MessageDigest.isEqual but for strings.
+   */
+  private def constantTimeStringEquals(a: String, b: String): Boolean = {
+    if (a.length != b.length) return false
+    
+    var result = 0
+    for (i <- a.indices) {
+      result |= a.charAt(i) ^ b.charAt(i)
+    }
+    result == 0
   }
 
 }
