@@ -30,4 +30,7 @@ USER root
 COPY entrypoint.sh /docker-entrypoint.sh
 ENTRYPOINT ["/docker-entrypoint.sh"]
 
+# Switch back to the elasticsearch user for security
+USER elasticsearch
+
 CMD /usr/share/elasticsearch/bin/elasticsearch
