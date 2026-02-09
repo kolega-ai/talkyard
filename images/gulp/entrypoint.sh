@@ -5,29 +5,46 @@
 
 cd /opt/talkyard/server
 
-# Create user 'owner' with the same id as the person who runs docker, so that file
-# 'gulp build' creates will be owned by that person (otherwise they'll be owned by root
-# on the host machine. Which makes them invisible & unusable, on the host machine).
-# But skip this if we're root already (perhaps we're root in a virtual machine).
+# Get the current user ID to determine our privilege level
+current_user_id=$(id -u)
+
+# Get file owner ID of the current directory (for volume mount scenarios)
 file_owner_id=`ls -adn | awk '{ print $3 }'`
-id -u owner >> /dev/null 2>&1
-if [ $? -eq 1 -a $file_owner_id -ne 0 ] ; then
-  # $? -eq 1 means that the last command failed, that is, user 'owner' not yet created.
-  # So create it:
-  # (--home-dir needs to be specified, because `npm install` and `bower install` write to
-  # cache dirs in the home dir, and it's nice to have those dirs below a dir mounted on the
-  # Docker host, so they'll persist across container recreations. [NODEHOME])
-  # -D = don't assign password (would block Docker waiting for input).
-  echo "Creating user 'owner' with id $file_owner_id..."
-  # Alpine:
-  # adduser -u $file_owner_id -h /opt/talkyard/server/volumes/gulp-home -D owner
-  # Debian:
-  adduser \
-      --uid $file_owner_id  \
-      --home /opt/talkyard/server/volumes/gulp-home  \
-      --disabled-password  \
-      --gecos ""  \
-      owner   # [5RZ4HA9]
+
+# Handle user creation/switching based on current privileges
+if [ "$current_user_id" -eq 0 ]; then
+  # We're running as root - can create/modify users as before
+  # Create user 'owner' with the same id as the person who runs docker, so that file
+  # 'gulp build' creates will be owned by that person (otherwise they'll be owned by root
+  # on the host machine. Which makes them invisible & unusable, on the host machine).
+  id -u owner >> /dev/null 2>&1
+  if [ $? -eq 1 -a $file_owner_id -ne 0 ] ; then
+    # $? -eq 1 means that the last command failed, that is, user 'owner' not yet created.
+    # So create it:
+    # (--home-dir needs to be specified, because `npm install` and `bower install` write to
+    # cache dirs in the home dir, and it's nice to have those dirs below a dir mounted on the
+    # Docker host, so they'll persist across container recreations. [NODEHOME])
+    # -D = don't assign password (would block Docker waiting for input).
+    echo "Creating user 'owner' with id $file_owner_id..."
+    # Alpine:
+    # adduser -u $file_owner_id -h /opt/talkyard/server/volumes/gulp-home -D owner
+    # Debian:
+    adduser \
+        --uid $file_owner_id  \
+        --home /opt/talkyard/server/volumes/gulp-home  \
+        --disabled-password  \
+        --gecos ""  \
+        owner   # [5RZ4HA9]
+  fi
+else
+  # We're running as non-root (nodeuser from Dockerfile)
+  # Check if we need to warn about potential file permission issues
+  if [ "$file_owner_id" -ne 0 ] && [ "$file_owner_id" -ne "$current_user_id" ]; then
+    echo "Warning: Running as UID $current_user_id but files are owned by UID $file_owner_id"
+    echo "For development with volume mounts, consider:"
+    echo "  docker run --user \$(id -u):\$(id -g) ..."
+    echo "  or rebuild with --build-arg USER_UID=\$(id -u)"
+  fi
 fi
 
 if [ -z "$*" ] ; then
@@ -43,21 +60,31 @@ fi
 # """uses the exec Bash command so final running application becomes container’s PID 1"""
 # — they use 'gosu' instead of 'su':  exec gosu postgres "$@"
 # but for me 'su' works fine.
-if [ $file_owner_id -ne 0 ] ; then
-  # Use user owner, which has the same user id as the file owner on the Docker host.
-  echo "Running the Gulp CMD as user id $file_owner_id":
-  set -x
-  # Avoid permission errors caused by root sometimes somehow becoming the owner.
-  chown -R owner.owner /opt/talkyard/server/volumes/gulp-home
-  chown -R owner.owner /opt/talkyard/server/node_modules
-  exec su -c "$*" owner
+if [ "$current_user_id" -eq 0 ]; then
+  # We're running as root - handle user switching as before
+  if [ $file_owner_id -ne 0 ] ; then
+    # Use user owner, which has the same user id as the file owner on the Docker host.
+    echo "Running the Gulp CMD as user id $file_owner_id":
+    set -x
+    # Avoid permission errors caused by root sometimes somehow becoming the owner.
+    chown -R owner.owner /opt/talkyard/server/volumes/gulp-home
+    chown -R owner.owner /opt/talkyard/server/node_modules
+    exec su -c "$*" owner
+  else
+    # We're root (user id 0), both on the Docker host and here in the container.
+    # `exec su ...` is the only way I've found that makes Yarn and Gulp respond to CTRL-C,
+    # so using `su` here although we're root already.
+    # Specify HOME so files that Node.js caches will persist across container recreations. [NODEHOME])
+    echo "Running the Gulp CMD as root":
+    set -x
+    exec su -c "HOME=/opt/talkyard/server/volumes/gulp-home $*" root
+  fi
 else
-  # We're root (user id 0), both on the Docker host and here in the container.
-  # `exec su ...` is the only way I've found that makes Yarn and Gulp respond to CTRL-C,
-  # so using `su` here although we're root already.
-  # Specify HOME so files that Node.js caches will persist across container recreations. [NODEHOME])
-  echo "Running the Gulp CMD as root":
+  # We're already running as non-root (nodeuser from Dockerfile)
+  # Just execute the command directly with proper HOME environment
+  echo "Running the Gulp CMD as user $(whoami) (UID: $current_user_id)":
   set -x
-  exec su -c "HOME=/opt/talkyard/server/volumes/gulp-home $*" root
+  export HOME=/opt/talkyard/server/volumes/gulp-home
+  exec "$@"
 fi
 
